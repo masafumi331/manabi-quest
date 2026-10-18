@@ -280,6 +280,10 @@
   // 3教科ボーナス（1日ごと）：その日に国語・理科・社会それぞれで need 個ずつ90%クリアすると yen 円（たし算。2つずつなら20+20=40円）
   const DAILY_BONUS = [ {need:1, yen:20}, {need:2, yen:20} ];
   const DAILY_BONUS_START = "2026-10-19";   // この日から対象
+  // 3日に1回の苦手チャレンジ：苦手ノートから最大20問。1度目で8割=40円、2度目で9割=20円（3度目以降は0円）
+  const WRONG_ROUND_EVERY = 3;   // 何日ごとに出すか
+  const WRONG_ROUND_MAX = 20;    // 最大の問題数
+  const WRONG_ROUND_RULE = [ {rate:0.8, yen:40}, {rate:0.9, yen:20} ];  // [1度目, 2度目]
   // ローカル（ダブルクリックで開いたとき）だけ教科書PDFを開ける
   const IS_FILE = (location.protocol === "file:");
 
@@ -296,7 +300,8 @@
   if(typeof progress.xp !== "number") progress.xp = 0;
   if(!progress.reviewTries) progress.reviewTries = {};     // 復習の挑戦回数（キー: 元の日付|教科|分野|番号）
   if(!progress.reviewRewards) progress.reviewRewards = {}; // 復習でもらった金額（同じキー。0円でも記録＝決着ずみ）
-  if(!progress.dailyBonus) progress.dailyBonus = {};     // 3教科ボーナス {日付: 円}（履歴を消しても残す）
+  if(!progress.dailyBonus) progress.dailyBonus = {};
+  if(!progress.wrongRounds) progress.wrongRounds = {};   // 苦手チャレンジ {開始日: {items, tries, reward}}（reward は決着したら数値）     // 3教科ボーナス {日付: 円}（履歴を消しても残す）
   if(!Array.isArray(progress.payments)) progress.payments = []; // おうちの人が支払った記録 [{t, amount, canceled?}]（取り消しは消さずに canceled 印。携帯どうしで合わせるため）
   let wrongs = load(WRONG_KEY, []);
   if(!Array.isArray(wrongs)) wrongs = [];
@@ -346,6 +351,7 @@
   // ---- HOME ----
   function renderHome(){
     const list = $("#subjectList"); list.innerHTML="";
+    const wcard = wrongRoundCard(); if(wcard) list.appendChild(wcard);   // 苦手チャレンジは国語の上
     SUBJECT_ORDER.forEach(subject=>{
       const sub = DATA[subject]; if(!sub) return;
       const meta = SUBJECT_META[subject];
@@ -544,6 +550,19 @@
         progress.reviewRewards[rk] = quiz.reviewGain;
       }
     }
+    // 苦手チャレンジ：1度目で8割=40円、2度目で9割=20円
+    quiz.wrGain = null;
+    if(quiz.mode==="wround"){
+      const r = progress.wrongRounds[quiz.roundDate];
+      if(r && r.reward==null){
+        r.tries = (r.tries||0) + 1;
+        const rule = WRONG_ROUND_RULE[r.tries-1];
+        if(rule && rate>=rule.rate){ r.reward = rule.yen; quiz.wrGain = rule.yen; }
+        else if(r.tries >= WRONG_ROUND_RULE.length){ r.reward = 0; }
+        if(r.reward!=null) r.doneDay = dkey(new Date());
+      }
+      quiz.wrTry = r? r.tries : 0;
+    }
     if(isRealSession(quiz)){
       const key = progKey(quiz.subject, quiz.fieldKey, quiz.sessionIdx);
       const prev = progress.sessions[key];
@@ -577,7 +596,13 @@
     $("#rsPts").textContent = `+${quiz.pts}pt かくとく！（さいだい🔥${quiz.maxCombo}れんぞく）`;
     // ごほうび表示（本セッションのみ）
     const rr=$("#rsReward");
-    if(quiz.mode==="review" && quiz.reviewKey){
+    if(quiz.mode==="wround"){
+      const r = progress.wrongRounds[quiz.roundDate] || {};
+      rr.style.display="";
+      if(quiz.wrGain){ rr.style.color="#2f8f2f"; rr.innerHTML=`🪙 苦手チャレンジ ${quiz.wrTry}度目で ${Math.round(WRONG_ROUND_RULE[quiz.wrTry-1].rate*100)}%たっせい！ ＋${quiz.wrGain}円 ゲット！🎉`; }
+      else if(r.reward!=null){ rr.style.color="#c26a00"; rr.innerHTML = r.reward>0 ? `🪙 このチャレンジのごほうび（${r.reward}円）は もうきまっているよ` : `💪 こんかいのチャレンジはここまで。まちがえた所を見直しておこう！`; }
+      else { const nx=WRONG_ROUND_RULE[r.tries||0]; rr.style.color="#c26a00"; rr.innerHTML=`🪙 つぎ（${(r.tries||0)+1}度目）は <b>${Math.round(nx.rate*100)}%</b> で <b>${nx.yen}円</b>！ もう一回ちょうせんしよう`; }
+    } else if(quiz.mode==="review" && quiz.reviewKey){
       const got = progress.reviewRewards[quiz.reviewKey];
       const nextAmt = REVIEW_REWARD[quiz.reviewTry] || 0;   // つぎ（reviewTry+1回目）にクリアしたときの金額
       const need=Math.max(1, Math.ceil(0.9*total)-score);
@@ -654,7 +679,7 @@
   }
   $("#againBtn").onclick = ()=>{ startQuiz(quiz); };
   $("#toSessBtn").onclick = ()=>{
-    if(quiz.mode==="mix"||quiz.mode==="wrong"||quiz.mode==="review"){ show("home"); renderHome(); }
+    if(quiz.mode==="mix"||quiz.mode==="wrong"||quiz.mode==="review"||quiz.mode==="wround"){ show("home"); renderHome(); }
     else openSessions(quiz.subject, quiz.fieldKey);
   };
 
@@ -805,6 +830,55 @@
     return blocks;
   }
   function allSessionTotal(){ let t=0; SUBJECT_ORDER.forEach(s=>{const sub=DATA[s]; if(sub)sub.fields.forEach(f=>t+=sessionCount(f));}); return t; }
+  // ---- 3日に1回の苦手チャレンジ ----
+  function dayNum(k){ const [y,m,d]=k.split("-").map(Number); return Math.round(new Date(y,m-1,d).getTime()/86400000); }
+  // いまのチャレンジ（3日たっていて苦手ノートに問題があれば、きょうの分を作る）
+  function currentWrongRound(){
+    const today = dkey(new Date());
+    const dates = Object.keys(progress.wrongRounds).sort();
+    const last = dates[dates.length-1];
+    if(last && dayNum(today) - dayNum(last) < WRONG_ROUND_EVERY) return { date:last, r:progress.wrongRounds[last] };
+    if(!wrongs.length) return null;
+    // 前のチャレンジの問題はもう使わないので消す（記録の大きさをおさえる）
+    dates.forEach(d=>{ delete progress.wrongRounds[d].items; });
+    progress.wrongRounds[today] = { tries:0, reward:null };   // 問題は はじめて押したときに決める
+    save(PROG_KEY, progress);
+    return { date:today, r:progress.wrongRounds[today] };
+  }
+  function pickWrongRoundItems(){
+    return wrongs.slice().sort((a,b)=>(b.count||1)-(a.count||1)).slice(0, WRONG_ROUND_MAX)
+      .map(w=>({ q:w.q, choices:w.choices, answer:w.answer, explain:w.explain,
+        _subject:w.subject, _field:w.field, _fieldKey:w.fieldKey }));
+  }
+  function wrongRoundCard(){
+    const cur = currentWrongRound(); if(!cur) return null;
+    const r = cur.r;
+    const nQ = r.items ? r.items.length : Math.min(wrongs.length, WRONG_ROUND_MAX);
+    if(!nQ) return null;
+    // 決着したチャレンジは、決着した日だけ「おわり」を出す
+    if(r.reward!=null && r.doneDay!==dkey(new Date())) return null;
+    const card = el("div","card");
+    card.style.background="linear-gradient(135deg,#ffe9ef,#ffffff)"; card.style.borderColor="#f3a6b8";
+    let line;
+    if(r.reward!=null) line = r.reward>0 ? `<b style="color:#2f8f2f">🏅 クリア！ ＋${r.reward}円</b>（つぎは${WRONG_ROUND_EVERY}日ごと）` : `こんかいは おわり（つぎは${WRONG_ROUND_EVERY}日ごと）`;
+    else { const t=r.tries||0; const nx=WRONG_ROUND_RULE[t];
+      line = t===0 ? `<b style="color:#c26a00">1度で8割なら ${WRONG_ROUND_RULE[0].yen}円！</b>　2度目で9割なら ${WRONG_ROUND_RULE[1].yen}円`
+                   : `<b style="color:#c26a00">${t+1}度目：${Math.round(nx.rate*100)}%で ${nx.yen}円！</b>`; }
+    card.innerHTML = `<div class="subj">
+      <div class="ic" style="background:#e5527a">📕</div>
+      <div><div class="nm">苦手チャレンジ（${nQ}問）</div>
+      <div class="ds">${WRONG_ROUND_EVERY}日に1回、まちがえた問題がまとめて出るよ</div>
+      <div class="ds" style="margin-top:3px">${line}</div></div>
+    </div>`;
+    if(r.reward==null) card.onclick = ()=>{
+      if(!r.items){ r.items = pickWrongRoundItems(); save(PROG_KEY, progress); }
+      startQuiz({ mode:"wround", subject:"苦手", fieldKey:null, sessionIdx:null,
+        name:"苦手チャレンジ", book:null, items:r.items, roundDate:cur.date });
+    };
+    else card.style.cursor="default";
+    return card;
+  }
+
   // その日に90%以上とったセッション数（教科ごと・同じセッションは1つ）
   function dayClears(day){
     const seen={}; const cnt={}; SUBJECT_ORDER.forEach(s=>cnt[s]=0);
@@ -841,10 +915,13 @@
     const reviewCount = rv.filter(v=>v>0).length;
     const moneyReview = rv.reduce((s,v)=>s+(v||0),0);
     const moneyDaily = Object.values(progress.dailyBonus||{}).reduce((s,v)=>s+(v||0),0);
+    const wr = Object.values(progress.wrongRounds||{});
+    const moneyWrong = wr.reduce((s,r)=>s+(r.reward||0),0);
+    const wrongWins = wr.filter(r=>r.reward>0).length;
     const dailyDays = Object.values(progress.dailyBonus||{}).filter(v=>v>0).length;
-    const total = money90+moneyStreak+moneyReview+moneyDaily;            // これまでの累計（支払った分もふくむ）
+    const total = money90+moneyStreak+moneyReview+moneyDaily+moneyWrong;            // これまでの累計（支払った分もふくむ）
     const paid = (progress.payments||[]).reduce((s,p)=>s+(p.canceled?0:(p.amount||0)),0);
-    return { cleared90, money90, blocks, moneyStreak, reviewCount, moneyReview, moneyDaily, dailyDays, total, paid, unpaid: Math.max(0, total-paid) };
+    return { cleared90, money90, blocks, moneyStreak, reviewCount, moneyReview, moneyDaily, dailyDays, moneyWrong, wrongWins, total, paid, unpaid: Math.max(0, total-paid) };
   }
   function renderRewardMeter(){
     const m=$("#rewardMeter"); if(!m) return;
@@ -860,7 +937,7 @@
         <div>
           <div style="font-weight:800;font-size:17px">まだもらっていない <span style="color:var(--accent)">${r.unpaid}円</span></div>
           <div style="font-size:12.5px;font-weight:700">これまでの合計 ${r.total}円（もらった分 ${r.paid}円）</div>
-          <div style="font-size:12.5px;color:var(--sub)">90%クリア ${r.cleared90}／${totalSess}こ（×${REWARD_PER_SESSION}円）${r.moneyReview? `・復習 ${r.moneyReview}円`:""}${r.moneyDaily? `・3教科 ${r.moneyDaily}円`:""}</div>
+          <div style="font-size:12.5px;color:var(--sub)">90%クリア ${r.cleared90}／${totalSess}こ（×${REWARD_PER_SESSION}円）${r.moneyReview? `・復習 ${r.moneyReview}円`:""}${r.moneyDaily? `・3教科 ${r.moneyDaily}円`:""}${r.moneyWrong? `・苦手 ${r.moneyWrong}円`:""}</div>
         </div>
       </div>
       <div style="margin-top:9px;font-size:13px;font-weight:700;color:#c26a00">${streakMsg}</div>
@@ -913,7 +990,8 @@
         ・90%クリア <b>${rw.cleared90}</b> こ × ${REWARD_PER_SESSION}円 ＝ <b>${rw.money90}円</b><br>
         ・${STREAK_DAYS}日連続ボーナス <b>${rw.blocks}</b> 回 × ${STREAK_REWARD}円 ＝ <b>${rw.moneyStreak}円</b><br>
         ・きのうの復習で90% <b>${rw.reviewCount}</b> 回（1回目${REVIEW_REWARD[0]}円・2回目${REVIEW_REWARD[1]}円）＝ <b>${rw.moneyReview}円</b><br>
-        ・3教科ボーナス <b>${rw.dailyDays}</b> 日（1つずつ${DAILY_BONUS[0].yen}円・2つずつでさらに${DAILY_BONUS[1].yen}円）＝ <b>${rw.moneyDaily}円</b>
+        ・3教科ボーナス <b>${rw.dailyDays}</b> 日（1つずつ${DAILY_BONUS[0].yen}円・2つずつでさらに${DAILY_BONUS[1].yen}円）＝ <b>${rw.moneyDaily}円</b><br>
+        ・苦手チャレンジ <b>${rw.wrongWins}</b> 回（1度目8割${WRONG_ROUND_RULE[0].yen}円・2度目9割${WRONG_ROUND_RULE[1].yen}円）＝ <b>${rw.moneyWrong}円</b>
       </div>
       <div class="grid" style="margin-top:10px" id="payBtns"></div>
       <div id="payHist" style="font-size:12.5px;color:#5a6470;margin-top:8px;line-height:1.8"></div>
@@ -1079,6 +1157,7 @@
       row(["　きのうの復習90%回数", rw.reviewCount]),
       row(["　復習ごほうび（円）", rw.moneyReview]),
       row(["　3教科ボーナス（円）", rw.moneyDaily]),
+      row(["　苦手チャレンジ（円）", rw.moneyWrong]),
       row(["クリア済みセッション", Object.values(progress.sessions).filter(x=>x).length]),
       row(["全セッション数", totalSess]),
       row(["のべ取り組み回数", activity.length]),
@@ -1216,7 +1295,8 @@
     const since = Date.now() - SYNC_DAYS*86400000;
     const obj = { v:1, at:new Date().toISOString(),
       progress:{ xp:progress.xp, sessions:progress.sessions, reviewTries:progress.reviewTries,
-        reviewRewards:progress.reviewRewards, payments:progress.payments, dailyBonus:progress.dailyBonus },
+        reviewRewards:progress.reviewRewards, payments:progress.payments, dailyBonus:progress.dailyBonus,
+        wrongRounds:Object.fromEntries(Object.entries(progress.wrongRounds).map(([d,r])=>[d,{tries:r.tries||0, reward:r.reward, doneDay:r.doneDay}])) },
       activity: activity.filter(a=>new Date(a.t).getTime()>=since) };
     const raw = new TextEncoder().encode(JSON.stringify(obj));
     if(typeof CompressionStream==="function") return "z"+b64u(await streamBytes(raw, new CompressionStream("deflate-raw")));
@@ -1236,6 +1316,12 @@
     if(typeof ip.xp==="number") progress.xp = Math.max(progress.xp, ip.xp);
     Object.entries(ip.reviewTries||{}).forEach(([k,v])=>{ progress.reviewTries[k]=Math.max(progress.reviewTries[k]||0, v); });
     Object.entries(ip.reviewRewards||{}).forEach(([k,v])=>{ if(!(k in progress.reviewRewards)) progress.reviewRewards[k]=v; });
+    Object.entries(ip.wrongRounds||{}).forEach(([d,v])=>{
+      const m=progress.wrongRounds[d];
+      if(!m){ progress.wrongRounds[d]={ tries:v.tries||0, reward:v.reward, doneDay:v.doneDay }; return; }
+      m.tries=Math.max(m.tries||0, v.tries||0);
+      if(m.reward==null && v.reward!=null){ m.reward=v.reward; m.doneDay=v.doneDay; }
+    });
     Object.entries(ip.dailyBonus||{}).forEach(([d,v])=>{ progress.dailyBonus[d]=Math.max(progress.dailyBonus[d]||0, v||0); });
     (ip.payments||[]).forEach(p=>{
       const m=progress.payments.find(x=>x.t===p.t);
