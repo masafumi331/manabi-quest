@@ -140,7 +140,7 @@
     <div id="rewardMeter" style="margin-bottom:14px"></div>
     <div class="grid" id="subjectList"></div>
     <div class="grid" style="margin-top:14px">
-      <button class="btn primary block" id="btnReview">🔁 きのうの復習（9割で40円）</button>
+      <button class="btn primary block" id="btnReview">🔁 きのうの復習（1度で9割なら40円）</button>
       <button class="btn sub block" id="btnMix">🎲 ぜんぶからランダム10問</button>
       <button class="btn sub block" id="btnWrong">📕 苦手ノート（まちがえた問題）</button>
       <button class="btn ghost block small" id="btnParent">📊 きろく（おうちの人用）</button>
@@ -276,6 +276,9 @@
   const STREAK_REWARD = 200;       // 連続ボーナスの金額（STREAK_DAYSごと・上限なし）
   // 「きのうの復習」（前日の問題をまぜて出題）で90%以上：1回目=40円、2回目=10円（3回目以降は0円・1日分につき1回）
   const REVIEW_REWARD = [40, 10];
+  // 3教科ボーナス（1日ごと）：その日に国語・理科・社会それぞれで need 個ずつ90%クリアすると yen 円（いちばん高い1つだけ）
+  const DAILY_BONUS = [ {need:1, yen:20}, {need:2, yen:40} ];
+  const DAILY_BONUS_START = "2026-10-19";   // この日から対象
   // ローカル（ダブルクリックで開いたとき）だけ教科書PDFを開ける
   const IS_FILE = (location.protocol === "file:");
 
@@ -292,6 +295,7 @@
   if(typeof progress.xp !== "number") progress.xp = 0;
   if(!progress.reviewTries) progress.reviewTries = {};     // 復習の挑戦回数（キー: 元の日付|教科|分野|番号）
   if(!progress.reviewRewards) progress.reviewRewards = {}; // 復習でもらった金額（同じキー。0円でも記録＝決着ずみ）
+  if(!progress.dailyBonus) progress.dailyBonus = {};     // 3教科ボーナス {日付: 円}（履歴を消しても残す）
   if(!Array.isArray(progress.payments)) progress.payments = []; // おうちの人が支払った記録 [{t, amount, canceled?}]（取り消しは消さずに canceled 印。携帯どうしで合わせるため）
   let wrongs = load(WRONG_KEY, []);
   if(!Array.isArray(wrongs)) wrongs = [];
@@ -558,6 +562,8 @@
       reviewOf:(quiz.mode==="review"? quiz.reviewOf : undefined) });
     if(activity.length > 800) activity = activity.slice(-800);
     save(ACT_KEY, activity);
+    quiz.dailyGain = refreshDailyBonus();
+    if(quiz.dailyGain) save(PROG_KEY, progress);
     updateHud();
     autoBackup();   // 自動保存フォルダが設定済みなら Dropbox に書き出す
     renderResult(score, total, stars);
@@ -596,6 +602,10 @@
       else { rr.style.color="#c26a00"; rr.innerHTML=`🪙 あと <b>${need}問</b> 正解で <b>${REWARD_PER_SESSION}円</b>！ もう一回ちょうせんできるよ`; }
       rr.style.display="";
     } else { rr.style.display="none"; rr.innerHTML=""; }
+    if(quiz.dailyGain){
+      rr.style.display=""; rr.style.color="#2f8f2f";
+      rr.innerHTML += `<div style="margin-top:6px">🏅 3教科ボーナス ＋${quiz.dailyGain}円 ゲット！</div>`;
+    }
     let emoji,msg;
     if(rate>=0.9){emoji="🏆";msg="パーフェクトにちかい！すごい！";}
     else if(rate>=0.7){emoji="🎉";msg="よくできました！その調子！";}
@@ -794,7 +804,32 @@
     return blocks;
   }
   function allSessionTotal(){ let t=0; SUBJECT_ORDER.forEach(s=>{const sub=DATA[s]; if(sub)sub.fields.forEach(f=>t+=sessionCount(f));}); return t; }
-  // ごほうび合計（90%クリア数×単価 ＋ 連続ボーナス）
+  // その日に90%以上とったセッション数（教科ごと・同じセッションは1つ）
+  function dayClears(day){
+    const seen={}; const cnt={}; SUBJECT_ORDER.forEach(s=>cnt[s]=0);
+    activity.forEach(a=>{
+      if(!((a.mode==="session"||!a.mode) && a.sessionIdx!=null && a.total>0 && a.score/a.total>=0.9)) return;
+      if(dkey(a.t)!==day || !(a.subject in cnt)) return;
+      const k=progKey(a.subject,a.fieldKey,a.sessionIdx); if(seen[k]) return; seen[k]=true; cnt[a.subject]++;
+    });
+    return cnt;
+  }
+  function dayBonusAmount(cnt){
+    const m=Math.min(...SUBJECT_ORDER.map(s=>cnt[s]||0)); let yen=0;
+    DAILY_BONUS.forEach(b=>{ if(m>=b.need) yen=Math.max(yen,b.yen); });
+    return yen;
+  }
+  // 履歴から3教科ボーナスを確定させる（増えるだけ・減らさない）。ふえた金額を返す
+  function refreshDailyBonus(){
+    let gained=0;
+    new Set(activity.map(a=>dkey(a.t))).forEach(d=>{
+      if(d<DAILY_BONUS_START) return;
+      const y=dayBonusAmount(dayClears(d)); const old=progress.dailyBonus[d]||0;
+      if(y>old){ progress.dailyBonus[d]=y; gained+=y-old; }
+    });
+    return gained;
+  }
+  // ごほうび合計（90%クリア数×単価 ＋ 連続ボーナス ＋ 復習 ＋ 3教科ボーナス）
   function rewardTotals(){
     let cleared90=0;
     Object.values(progress.sessions).forEach(s=>{ if(s && s.stars===3) cleared90++; });
@@ -804,9 +839,11 @@
     const rv = Object.values(progress.reviewRewards||{});
     const reviewCount = rv.filter(v=>v>0).length;
     const moneyReview = rv.reduce((s,v)=>s+(v||0),0);
-    const total = money90+moneyStreak+moneyReview;            // これまでの累計（支払った分もふくむ）
+    const moneyDaily = Object.values(progress.dailyBonus||{}).reduce((s,v)=>s+(v||0),0);
+    const dailyDays = Object.values(progress.dailyBonus||{}).filter(v=>v>0).length;
+    const total = money90+moneyStreak+moneyReview+moneyDaily;            // これまでの累計（支払った分もふくむ）
     const paid = (progress.payments||[]).reduce((s,p)=>s+(p.canceled?0:(p.amount||0)),0);
-    return { cleared90, money90, blocks, moneyStreak, reviewCount, moneyReview, total, paid, unpaid: Math.max(0, total-paid) };
+    return { cleared90, money90, blocks, moneyStreak, reviewCount, moneyReview, moneyDaily, dailyDays, total, paid, unpaid: Math.max(0, total-paid) };
   }
   function renderRewardMeter(){
     const m=$("#rewardMeter"); if(!m) return;
@@ -822,11 +859,29 @@
         <div>
           <div style="font-weight:800;font-size:17px">まだもらっていない <span style="color:var(--accent)">${r.unpaid}円</span></div>
           <div style="font-size:12.5px;font-weight:700">これまでの合計 ${r.total}円（もらった分 ${r.paid}円）</div>
-          <div style="font-size:12.5px;color:var(--sub)">90%クリア ${r.cleared90}／${totalSess}こ（×${REWARD_PER_SESSION}円）${r.moneyReview? `・復習 ${r.moneyReview}円`:""}</div>
+          <div style="font-size:12.5px;color:var(--sub)">90%クリア ${r.cleared90}／${totalSess}こ（×${REWARD_PER_SESSION}円）${r.moneyReview? `・復習 ${r.moneyReview}円`:""}${r.moneyDaily? `・3教科 ${r.moneyDaily}円`:""}</div>
         </div>
       </div>
       <div style="margin-top:9px;font-size:13px;font-weight:700;color:#c26a00">${streakMsg}</div>
+      ${dailyBonusHtml()}
     </div>`;
+  }
+  // きょうの3教科ボーナス（クリアしたらメダル）
+  function dailyBonusHtml(){
+    const cnt=dayClears(dkey(new Date()));
+    const subj = SUBJECT_ORDER.map(s=>{
+      const n=cnt[s]||0; const top=DAILY_BONUS[DAILY_BONUS.length-1].need;
+      const mark = n>=top? "🥇" : (n>=1? "🥈" : "⚪");
+      return `<span style="white-space:nowrap">${mark}${s} ${Math.min(n,top)}/${top}</span>`;
+    }).join("　");
+    const rows = DAILY_BONUS.map(b=>{
+      const ok = SUBJECT_ORDER.every(s=>(cnt[s]||0)>=b.need);
+      return `<div style="${ok?"color:#2f8f2f;font-weight:800":"color:var(--sub)"}">${ok?"🏅":"⚪"} 3教科を${b.need}つずつクリア ＋${b.yen}円${ok?"　ゲット！":""}</div>`;
+    }).join("");
+    return `<div style="margin-top:10px;padding-top:9px;border-top:1px dashed #e6cfa8;font-size:13px;line-height:1.8">
+      <div style="font-weight:800">🎖 きょうの3教科ボーナス</div>
+      <div>${subj}</div>${rows}
+      <div style="font-size:11.5px;color:var(--sub)">90%とったセッションを数えるよ（ボーナスは1日でいちばん高い1つ）</div></div>`;
   }
 
   function openParent(){
@@ -856,7 +911,8 @@
       <div style="font-size:13px;color:#5a6470;margin-top:6px;line-height:1.9">
         ・90%クリア <b>${rw.cleared90}</b> こ × ${REWARD_PER_SESSION}円 ＝ <b>${rw.money90}円</b><br>
         ・${STREAK_DAYS}日連続ボーナス <b>${rw.blocks}</b> 回 × ${STREAK_REWARD}円 ＝ <b>${rw.moneyStreak}円</b><br>
-        ・きのうの復習で90% <b>${rw.reviewCount}</b> 回（1回目${REVIEW_REWARD[0]}円・2回目${REVIEW_REWARD[1]}円）＝ <b>${rw.moneyReview}円</b>
+        ・きのうの復習で90% <b>${rw.reviewCount}</b> 回（1回目${REVIEW_REWARD[0]}円・2回目${REVIEW_REWARD[1]}円）＝ <b>${rw.moneyReview}円</b><br>
+        ・3教科ボーナス <b>${rw.dailyDays}</b> 日（1つずつ${DAILY_BONUS[0].yen}円・2つずつ${DAILY_BONUS[1].yen}円）＝ <b>${rw.moneyDaily}円</b>
       </div>
       <div class="grid" style="margin-top:10px" id="payBtns"></div>
       <div id="payHist" style="font-size:12.5px;color:#5a6470;margin-top:8px;line-height:1.8"></div>
@@ -1021,6 +1077,7 @@
       row(["　連続ボーナス（円）", rw.moneyStreak]),
       row(["　きのうの復習90%回数", rw.reviewCount]),
       row(["　復習ごほうび（円）", rw.moneyReview]),
+      row(["　3教科ボーナス（円）", rw.moneyDaily]),
       row(["クリア済みセッション", Object.values(progress.sessions).filter(x=>x).length]),
       row(["全セッション数", totalSess]),
       row(["のべ取り組み回数", activity.length]),
@@ -1158,7 +1215,7 @@
     const since = Date.now() - SYNC_DAYS*86400000;
     const obj = { v:1, at:new Date().toISOString(),
       progress:{ xp:progress.xp, sessions:progress.sessions, reviewTries:progress.reviewTries,
-        reviewRewards:progress.reviewRewards, payments:progress.payments },
+        reviewRewards:progress.reviewRewards, payments:progress.payments, dailyBonus:progress.dailyBonus },
       activity: activity.filter(a=>new Date(a.t).getTime()>=since) };
     const raw = new TextEncoder().encode(JSON.stringify(obj));
     if(typeof CompressionStream==="function") return "z"+b64u(await streamBytes(raw, new CompressionStream("deflate-raw")));
@@ -1178,6 +1235,7 @@
     if(typeof ip.xp==="number") progress.xp = Math.max(progress.xp, ip.xp);
     Object.entries(ip.reviewTries||{}).forEach(([k,v])=>{ progress.reviewTries[k]=Math.max(progress.reviewTries[k]||0, v); });
     Object.entries(ip.reviewRewards||{}).forEach(([k,v])=>{ if(!(k in progress.reviewRewards)) progress.reviewRewards[k]=v; });
+    Object.entries(ip.dailyBonus||{}).forEach(([d,v])=>{ progress.dailyBonus[d]=Math.max(progress.dailyBonus[d]||0, v||0); });
     (ip.payments||[]).forEach(p=>{
       const m=progress.payments.find(x=>x.t===p.t);
       if(m){ if(p.canceled) m.canceled=true; } else progress.payments.push(Object.assign({},p));
@@ -1187,6 +1245,7 @@
     (inc.activity||[]).forEach(a=>{ if(!have.has(a.t)){ activity.push(a); have.add(a.t); added++; } });
     activity.sort((a,b)=>a.t<b.t?-1:1);
     if(activity.length > 800) activity = activity.slice(-800);
+    refreshDailyBonus();
     save(PROG_KEY, progress); save(ACT_KEY, activity);
     return added;
   }
@@ -1218,6 +1277,7 @@
   if(!DATA || !Object.keys(DATA).length){
     document.querySelector(".wrap").innerHTML = '<div class="empty">問題データが読みこめませんでした。data フォルダのファイルがあるか確認してね。</div>';
   } else {
+    if(refreshDailyBonus()) save(PROG_KEY, progress);
     renderHome();
     loadBackupDir();
     receiveFromHash();
