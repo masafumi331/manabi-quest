@@ -276,7 +276,7 @@
   const STREAK_REWARD = 200;       // 連続ボーナスの金額（STREAK_DAYSごと・上限なし）
   // 「きのうの復習」（前日の問題をまぜて出題）で90%以上：1回目=40円、2回目=10円（3回目以降は0円・1日分につき1回）
   const REVIEW_REWARD = [40, 10];
-  // 3教科ボーナス（1日ごと）：その日に国語・理科・社会それぞれで need 個ずつ90%クリアすると yen 円（いちばん高い1つだけ）
+  // 3教科ボーナス（1日ごと）：その日に国語・理科・社会それぞれで need 個ずつ90%クリアすると yen 円（たし算。2つずつなら20+40=60円）
   const DAILY_BONUS = [ {need:1, yen:20}, {need:2, yen:40} ];
   const DAILY_BONUS_START = "2026-10-19";   // この日から対象
   // ローカル（ダブルクリックで開いたとき）だけ教科書PDFを開ける
@@ -816,7 +816,7 @@
   }
   function dayBonusAmount(cnt){
     const m=Math.min(...SUBJECT_ORDER.map(s=>cnt[s]||0)); let yen=0;
-    DAILY_BONUS.forEach(b=>{ if(m>=b.need) yen=Math.max(yen,b.yen); });
+    DAILY_BONUS.forEach(b=>{ if(m>=b.need) yen+=b.yen; });
     return yen;
   }
   // 履歴から3教科ボーナスを確定させる（増えるだけ・減らさない）。ふえた金額を返す
@@ -881,7 +881,7 @@
     return `<div style="margin-top:10px;padding-top:9px;border-top:1px dashed #e6cfa8;font-size:13px;line-height:1.8">
       <div style="font-weight:800">🎖 きょうの3教科ボーナス</div>
       <div>${subj}</div>${rows}
-      <div style="font-size:11.5px;color:var(--sub)">90%とったセッションを数えるよ（ボーナスは1日でいちばん高い1つ）</div></div>`;
+      <div style="font-size:11.5px;color:var(--sub)">90%とったセッションを数えるよ（2つずつまでいくと 1日 合計60円）</div></div>`;
   }
 
   function openParent(){
