@@ -552,7 +552,7 @@
       const alreadyCleared = progress.sessions[key] && progress.sessions[key].stars===3;
       const need=Math.max(1, Math.ceil(0.9*total)-score);
       if(quiz.newlyCleared){ rr.style.color="#2f8f2f"; rr.innerHTML=`🪙 90%たっせい！ ＋${REWARD_PER_SESSION}円 ゲット！🎉`; }
-      else if(alreadyCleared){ rr.style.color="#2f8f2f"; rr.innerHTML=`🪙 このセッションは90%クリアずみ（＋${REWARD_PER_SESSION}円）`; }
+      else if(alreadyCleared){ rr.style.color="#2f8f2f"; rr.innerHTML=`🪙 このセッションの${REWARD_PER_SESSION}円はゲットずみ（ごほうびは1セッション1回だけ）`; }
       else { rr.style.color="#c26a00"; rr.innerHTML=`🪙 あと <b>${need}問</b> 正解で <b>${REWARD_PER_SESSION}円</b>！ もう一回ちょうせんできるよ`; }
       rr.style.display="";
     } else { rr.style.display="none"; rr.innerHTML=""; }
