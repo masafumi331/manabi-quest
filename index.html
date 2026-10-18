@@ -1,0 +1,909 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>サチカのまなびクエスト</title>
+<style>
+  :root{
+    --bg:#fdf6ec; --card:#ffffff; --ink:#333a45; --sub:#7b8794;
+    --line:#ece3d6; --accent:#ff7a59; --accent2:#ffd166;
+    --ok:#38b000; --ng:#e5484d; --shadow:0 6px 0 rgba(0,0,0,.08),0 10px 24px rgba(0,0,0,.08);
+    --kokugo:#e5484d; --rika:#2bb673; --shakai:#3b82f6;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:"Hiragino Maru Gothic ProN","Yu Gothic UI","Meiryo",system-ui,sans-serif;
+    background:var(--bg); color:var(--ink);
+    -webkit-text-size-adjust:100%;
+  }
+  .wrap{max-width:720px;margin:0 auto;padding:16px 16px 60px;}
+  .topbar{display:flex;align-items:center;gap:10px;margin:4px 0 14px;}
+  .brand{font-weight:800;font-size:20px;letter-spacing:.02em;display:flex;align-items:center;gap:8px}
+  .brand .m{font-size:26px}
+  .spacer{flex:1}
+  .xp{background:var(--card);border:2px solid var(--line);border-radius:999px;padding:6px 12px;font-weight:700;font-size:13px;box-shadow:var(--shadow)}
+  .xp b{color:var(--accent)}
+  h2.title{font-size:19px;margin:2px 0 12px;display:flex;align-items:center;gap:8px}
+  .hint{color:var(--sub);font-size:13px;line-height:1.7;margin:0 0 14px}
+  .grid{display:grid;gap:12px}
+  .card{
+    background:var(--card);border:2px solid var(--line);border-radius:18px;
+    padding:16px 16px;box-shadow:var(--shadow);cursor:pointer;
+    transition:transform .08s ease, box-shadow .08s ease; user-select:none;
+  }
+  .card:active{transform:translateY(3px);box-shadow:0 3px 0 rgba(0,0,0,.08)}
+  .subj{display:flex;align-items:center;gap:14px}
+  .subj .ic{width:52px;height:52px;border-radius:14px;display:grid;place-items:center;font-size:28px;color:#fff;flex:none}
+  .subj .nm{font-weight:800;font-size:18px}
+  .subj .ds{color:var(--sub);font-size:12.5px;margin-top:2px}
+  .row{display:flex;align-items:center;gap:12px}
+  .pill{font-size:12px;font-weight:700;color:var(--sub);background:#f3eee4;border-radius:999px;padding:3px 10px}
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    border:none;border-radius:14px;padding:13px 18px;font-weight:800;font-size:15px;
+    cursor:pointer;font-family:inherit;box-shadow:0 4px 0 rgba(0,0,0,.12);transition:transform .07s;
+  }
+  .btn:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,.12)}
+  .btn.primary{background:var(--accent);color:#fff}
+  .btn.sub{background:#fff;color:var(--ink);border:2px solid var(--line);box-shadow:0 4px 0 rgba(0,0,0,.06)}
+  .btn.ghost{background:transparent;color:var(--sub);box-shadow:none;border:2px solid var(--line)}
+  .btn.block{width:100%}
+  .btn.small{padding:8px 12px;font-size:13px}
+  .back{background:none;border:none;color:var(--sub);font-weight:700;font-size:14px;cursor:pointer;padding:6px 0;font-family:inherit}
+  .sess{display:flex;align-items:center;gap:12px}
+  .sess .no{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;font-weight:800;color:#fff;flex:none}
+  .sess .stars{font-size:15px;letter-spacing:2px}
+  .sess .meta{font-size:12px;color:var(--sub)}
+  .locked{opacity:.55}
+  /* quiz */
+  .qhead{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .progress{flex:1;height:12px;background:#eee4d4;border-radius:999px;overflow:hidden}
+  .progress > i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent2),var(--accent));transition:width .3s}
+  .combo{font-weight:800;color:var(--accent);font-size:14px;min-width:66px;text-align:right}
+  .qcard{background:var(--card);border:2px solid var(--line);border-radius:20px;padding:20px 18px;box-shadow:var(--shadow)}
+  .qtag{font-size:12px;font-weight:700;color:#fff;border-radius:999px;padding:3px 10px;display:inline-block;margin-bottom:10px}
+  .qtext{font-size:19px;font-weight:700;line-height:1.7;white-space:pre-wrap;margin-bottom:16px}
+  .choices{display:grid;gap:10px}
+  .choice{
+    text-align:left;background:#fff;border:2px solid var(--line);border-radius:14px;padding:14px 16px;
+    font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;color:var(--ink);
+    display:flex;gap:12px;align-items:center;transition:transform .06s, border-color .1s, background .1s;
+  }
+  .choice:active{transform:scale(.99)}
+  .choice .lab{width:26px;height:26px;border-radius:8px;background:#f1ece2;display:grid;place-items:center;font-size:14px;font-weight:800;color:var(--sub);flex:none}
+  .choice.ok{border-color:var(--ok);background:#eafbe7}
+  .choice.ok .lab{background:var(--ok);color:#fff}
+  .choice.ng{border-color:var(--ng);background:#fdecec}
+  .choice.ng .lab{background:var(--ng);color:#fff}
+  .choice.dim{opacity:.55}
+  .feedback{margin-top:14px;border-radius:14px;padding:14px 16px;font-size:14px;line-height:1.7;display:none}
+  .feedback.show{display:block;animation:pop .2s ease}
+  .feedback.good{background:#eafbe7;border:2px solid #bfe9b4}
+  .feedback.bad{background:#fdecec;border:2px solid #f4c3c4}
+  .feedback .fb-h{font-weight:800;margin-bottom:4px}
+  @keyframes pop{from{transform:scale(.97);opacity:.4}to{transform:scale(1);opacity:1}}
+  .qfoot{margin-top:16px;display:flex;gap:10px}
+  /* result */
+  .result{background:var(--card);border:2px solid var(--line);border-radius:20px;padding:24px 18px;box-shadow:var(--shadow);text-align:center}
+  .result .big{font-size:56px;margin:6px 0}
+  .result .score{font-size:30px;font-weight:800}
+  .result .stars{font-size:34px;letter-spacing:6px;margin:6px 0}
+  .review{margin-top:16px;display:grid;gap:10px;text-align:left}
+  .rev{border:2px solid var(--line);border-radius:14px;padding:12px 14px;background:#fff}
+  .rev.wrong{border-color:#f4c3c4;background:#fff7f7}
+  .rev .rq{font-weight:700;font-size:14.5px;white-space:pre-wrap;line-height:1.6}
+  .rev .ra{font-size:13.5px;margin-top:6px}
+  .rev .ra .you{color:var(--ng);font-weight:700}
+  .rev .ra .cor{color:var(--ok);font-weight:800}
+  .rev .ex{font-size:13px;color:#4a5560;margin-top:6px;line-height:1.7;background:#f7f3ec;border-radius:10px;padding:8px 10px}
+  .wnote{background:#fff;border:2px solid var(--line);border-radius:14px;padding:14px;margin-bottom:10px}
+  .wnote .wq{font-weight:700;font-size:14px;white-space:pre-wrap}
+  .wnote .wm{font-size:12px;color:var(--sub);margin-top:4px}
+  .empty{color:var(--sub);text-align:center;padding:30px 10px;font-size:14px;line-height:1.8}
+  .sticky{position:sticky;bottom:0;background:linear-gradient(transparent,var(--bg) 30%);padding-top:14px}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:#333a45;color:#fff;padding:10px 16px;border-radius:999px;font-size:13px;font-weight:700;opacity:0;transition:.25s;z-index:50}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .confetti{position:fixed;top:-20px;font-size:20px;z-index:40;animation:fall linear forwards;pointer-events:none}
+  @keyframes fall{to{transform:translateY(105vh) rotate(360deg);opacity:.9}}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .stat{background:var(--card);border:2px solid var(--line);border-radius:14px;padding:12px 8px;text-align:center;box-shadow:var(--shadow)}
+  .stat b{display:block;font-size:22px;color:var(--accent);line-height:1.2}
+  .stat span{font-size:11px;color:var(--sub)}
+  .heat{display:flex;flex-wrap:wrap;gap:5px}
+  .heat .d{width:30px;height:30px;border-radius:7px;background:#eee4d4;display:grid;place-items:center;font-size:10px;color:#9a8f7d;position:relative}
+  .heat .d small{position:absolute;top:-14px;left:0;right:0;text-align:center;font-size:8px;color:#b7ab97}
+  .hist{display:grid;gap:8px}
+  .hrow{display:flex;align-items:center;gap:10px;background:#fff;border:2px solid var(--line);border-radius:12px;padding:9px 12px;font-size:13px}
+  .hrow .hd{color:var(--sub);font-size:11px;min-width:98px}
+  .hrow .hs{margin-left:auto;font-weight:800}
+  .subjstat{background:#fff;border:2px solid var(--line);border-radius:14px;padding:12px 14px}
+  .subjstat .bar{height:9px;background:#eee4d4;border-radius:999px;overflow:hidden;margin-top:7px}
+  .subjstat .bar > i{display:block;height:100%;border-radius:999px}
+  .hide{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div class="brand"><span class="m">🦉</span>まなびクエスト</div>
+    <div class="spacer"></div>
+    <div class="xp">レベル <b id="lv">1</b> ・ ⭐<span id="starsum">0</span></div>
+  </div>
+
+  <!-- HOME -->
+  <section id="home">
+    <h2 class="title">📚 きょうは どれを べんきょうする？</h2>
+    <p class="hint">教科 → 分野 をえらぶと、10問ずつのセッションに挑戦できるよ。<br>よく出るところを中心に作ってあるよ。まちがえた問題は「苦手ノート」にたまっていくよ。</p>
+    <div id="rewardMeter" style="margin-bottom:14px"></div>
+    <div class="grid" id="subjectList"></div>
+    <div class="grid" style="margin-top:14px">
+      <button class="btn primary block" id="btnReview">🔁 きのうの復習</button>
+      <button class="btn sub block" id="btnMix">🎲 ぜんぶからランダム10問</button>
+      <button class="btn sub block" id="btnWrong">📕 苦手ノート（まちがえた問題）</button>
+      <button class="btn ghost block small" id="btnParent">📊 きろく（おうちの人用）</button>
+    </div>
+  </section>
+
+  <!-- FIELDS -->
+  <section id="fields" class="hide">
+    <button class="back" data-go="home">← 教科をえらぶ</button>
+    <h2 class="title" id="fieldTitle"></h2>
+    <div class="grid" id="fieldList"></div>
+  </section>
+
+  <!-- SESSIONS -->
+  <section id="sessions" class="hide">
+    <button class="back" data-go="fields">← 分野をえらぶ</button>
+    <h2 class="title" id="sessTitle"></h2>
+    <p class="hint" id="sessHint"></p>
+    <div class="grid" id="sessionList"></div>
+  </section>
+
+  <!-- QUIZ -->
+  <section id="quiz" class="hide">
+    <div class="qhead">
+      <button class="back" id="quizQuit">× やめる</button>
+      <div class="progress"><i id="progBar"></i></div>
+      <div class="combo" id="comboBox"></div>
+    </div>
+    <div class="qcard">
+      <span class="qtag" id="qtag"></span>
+      <div class="qtext" id="qtext"></div>
+      <div class="choices" id="choices"></div>
+      <div class="feedback" id="feedback">
+        <div class="fb-h" id="fbHead"></div>
+        <div id="fbBody"></div>
+      </div>
+      <div class="qfoot hide" id="qfoot">
+        <button class="btn primary block" id="nextBtn">つぎへ →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- RESULT -->
+  <section id="result" class="hide">
+    <div class="result">
+      <div class="big" id="rsEmoji">🎉</div>
+      <div id="rsMsg" style="font-weight:800;font-size:18px"></div>
+      <div class="score"><span id="rsScore">0</span> / <span id="rsTotal">10</span> 問せいかい</div>
+      <div class="stars" id="rsStars">☆☆☆</div>
+      <div style="color:var(--sub);font-size:13px" id="rsPts"></div>
+      <div id="rsReward" style="margin-top:10px;font-weight:800;font-size:15px"></div>
+    </div>
+    <h2 class="title" style="margin-top:20px">📝 答えあわせ＆復習</h2>
+    <p class="hint" id="rsBookLine"></p>
+    <div class="review" id="reviewList"></div>
+    <div class="sticky">
+      <div class="grid">
+        <button class="btn primary block" id="againBtn">🔁 もう一度このセッション</button>
+        <button class="btn sub block" id="toSessBtn">セッション一覧へ</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- WRONG BOOK -->
+  <section id="wrongbook" class="hide">
+    <button class="back" data-go="home">← ホームへ</button>
+    <h2 class="title">📕 苦手ノート</h2>
+    <p class="hint" id="wbHint"></p>
+    <div class="grid" id="wbActions"></div>
+    <div id="wbList" style="margin-top:14px"></div>
+  </section>
+
+  <!-- PARENT / きろく -->
+  <section id="parent" class="hide">
+    <button class="back" data-go="home">← ホームへ</button>
+    <h2 class="title">📊 きろく（おうちの人用）</h2>
+    <p class="hint">サチカがどれくらい取り組んだかのまとめです。進み具合はこのPC（ブラウザ）に保存されています。</p>
+    <div id="pSummary"></div>
+    <div id="pReward" style="margin-top:14px"></div>
+    <h2 class="title" style="margin-top:18px;font-size:16px">📅 さいきん3週間（やった問題数）</h2>
+    <div id="pHeat"></div>
+    <h2 class="title" style="margin-top:18px;font-size:16px">📈 正答率のうつりかわり（やった日ごと）</h2>
+    <div id="pTrend" class="grid" style="gap:7px"></div>
+    <h2 class="title" style="margin-top:18px;font-size:16px">📚 教科べつ</h2>
+    <div id="pBySubject" class="grid"></div>
+    <h2 class="title" style="margin-top:18px;font-size:16px">🕑 さいきんの取り組み</h2>
+    <div id="pHistory"></div>
+    <div class="grid" style="margin-top:14px">
+      <button class="btn sub block small" id="pExport">💾 記録を書き出す（CSV保存）</button>
+      <button class="btn ghost block small" id="pClear">🗑 記録を消す</button>
+    </div>
+    <p class="hint" style="margin-top:8px">※「★・ベスト点」などの進み具合は消えません。消えるのは日々の取り組み履歴だけです。</p>
+  </section>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="data/kokugo.js"></script>
+<script src="data/rika.js"></script>
+<script src="data/shakai.js"></script>
+<script>
+"use strict";
+(function(){
+  const SUBJECT_ORDER = ["国語","理科","社会"];
+  const SUBJECT_META = {
+    "国語":{color:"var(--kokugo)", icon:"✏️", desc:"漢字・ことわざ・慣用句"},
+    "理科":{color:"var(--rika)", icon:"🔬", desc:"気象・力・生き物・地学"},
+    "社会":{color:"var(--shakai)", icon:"🗾", desc:"歴史・地理・公民"},
+  };
+  const DATA = window.QUIZ_DATA || {};
+  const PROG_KEY = "fujimi_quiz_progress_v1";
+  const WRONG_KEY = "fujimi_quiz_wrong_v1";
+  const ACT_KEY = "fujimi_quiz_activity_v1";
+  const SESSION_SIZE = 10;
+  // ---- ごほうび設定（金額やルールはここを変える） ----
+  const REWARD_PER_SESSION = 20;   // 1セッションで正答率90%以上（★3）になると もらえる金額
+  const STREAK_DAYS = 7;           // 連続日数ボーナスの日数
+  const STREAK_REWARD = 200;       // 連続ボーナスの金額（STREAK_DAYSごと・上限なし）
+  // ローカル（ダブルクリックで開いたとき）だけ教科書PDFを開ける
+  const IS_FILE = (location.protocol === "file:");
+
+  // ---- storage helpers (safe) ----
+  function load(key, def){
+    try{ const v = localStorage.getItem(key); return v? JSON.parse(v): def; }
+    catch(e){ return def; }
+  }
+  function save(key, val){
+    try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){}
+  }
+  let progress = load(PROG_KEY, {xp:0, sessions:{}});
+  if(!progress.sessions) progress.sessions = {};
+  if(typeof progress.xp !== "number") progress.xp = 0;
+  let wrongs = load(WRONG_KEY, []);
+  if(!Array.isArray(wrongs)) wrongs = [];
+  let activity = load(ACT_KEY, []);   // 取り組み履歴（保護者用）
+  if(!Array.isArray(activity)) activity = [];
+
+  // ---- utils ----
+  const $ = sel => document.querySelector(sel);
+  function el(tag, cls, html){ const e=document.createElement(tag); if(cls)e.className=cls; if(html!=null)e.innerHTML=html; return e; }
+  function esc(s){ return String(s).replace(/[&<>]/g, c=>({ "&":"&amp;","<":"&lt;",">":"&gt;" }[c])); }
+  function shuffle(arr){ const a=arr.slice(); for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]];} return a; }
+  function show(id){ ["home","fields","sessions","quiz","result","wrongbook","parent"].forEach(s=>{ $("#"+s).classList.toggle("hide", s!==id); }); window.scrollTo(0,0); }
+  function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("show"),1800); }
+
+  function getField(subject, fieldKey){
+    const sub = DATA[subject]; if(!sub) return null;
+    return sub.fields.find(f=>f.key===fieldKey) || null;
+  }
+  function sessionCount(field){ return Math.max(1, Math.ceil(field.items.length / SESSION_SIZE)); }
+  function sessionItems(field, idx){ return field.items.slice(idx*SESSION_SIZE, idx*SESSION_SIZE+SESSION_SIZE); }
+  function progKey(subject, fieldKey, idx){ return subject+"|"+fieldKey+"|"+idx; }
+  function wrongKey(w){ return w.subject+"|"+w.field+"|"+w.q; }
+
+  function updateHud(){
+    let sumStars=0; Object.values(progress.sessions).forEach(s=>{ sumStars += (s.stars||0); });
+    $("#starsum").textContent = sumStars;
+    const lv = 1 + Math.floor(progress.xp/100);
+    $("#lv").textContent = lv;
+  }
+
+  // ---- HOME ----
+  function renderHome(){
+    const list = $("#subjectList"); list.innerHTML="";
+    SUBJECT_ORDER.forEach(subject=>{
+      const sub = DATA[subject]; if(!sub) return;
+      const meta = SUBJECT_META[subject];
+      let total=0, cleared=0;
+      sub.fields.forEach(f=>{ const sc=sessionCount(f); total+=sc; for(let i=0;i<sc;i++){ if(progress.sessions[progKey(subject,f.key,i)]) cleared++; } });
+      const card = el("div","card");
+      card.innerHTML = `<div class="subj">
+        <div class="ic" style="background:${meta.color}">${meta.icon}</div>
+        <div><div class="nm">${subject}</div><div class="ds">${meta.desc}</div></div>
+        <div class="spacer"></div>
+        <div class="pill">${cleared}/${total}セッション</div>
+      </div>`;
+      card.onclick = ()=>openFields(subject);
+      list.appendChild(card);
+    });
+    updateHud();
+    renderRewardMeter();
+  }
+
+  // ---- FIELDS ----
+  let curSubject=null;
+  function openFields(subject){
+    curSubject = subject;
+    const sub = DATA[subject]; const meta=SUBJECT_META[subject];
+    $("#fieldTitle").innerHTML = `${meta.icon} ${subject}｜分野をえらぶ`;
+    const list = $("#fieldList"); list.innerHTML="";
+    sub.fields.forEach(f=>{
+      const sc = sessionCount(f);
+      let cleared=0; for(let i=0;i<sc;i++){ if(progress.sessions[progKey(subject,f.key,i)]) cleared++; }
+      const card = el("div","card");
+      card.innerHTML = `<div class="row">
+        <div class="ic" style="width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-size:22px;color:#fff;background:${meta.color}">●</div>
+        <div><div class="nm" style="font-weight:800">${esc(f.name)}</div>
+        <div class="ds" style="color:var(--sub);font-size:12.5px">全${f.items.length}問・${sc}セッション</div></div>
+        <div class="spacer"></div>
+        <div class="pill">${cleared}/${sc}</div>
+      </div>`;
+      card.onclick = ()=>openSessions(subject, f.key);
+      list.appendChild(card);
+    });
+    show("fields");
+  }
+
+  // ---- SESSIONS ----
+  let curFieldKey=null;
+  function openSessions(subject, fieldKey){
+    curSubject=subject; curFieldKey=fieldKey;
+    const field = getField(subject, fieldKey);
+    const meta = SUBJECT_META[subject];
+    $("#sessTitle").innerHTML = `${meta.icon} ${esc(field.name)}`;
+    $("#sessHint").textContent = `1セッション${SESSION_SIZE}問（最後のセッションは少なめのことがあるよ）。クリアすると★がつくよ。`;
+    const list = $("#sessionList"); list.innerHTML="";
+    const sc = sessionCount(field);
+    for(let i=0;i<sc;i++){
+      const items = sessionItems(field, i);
+      const rec = progress.sessions[progKey(subject,fieldKey,i)];
+      const stars = rec? rec.stars : 0;
+      const card = el("div","card");
+      card.innerHTML = `<div class="sess">
+        <div class="no" style="background:${meta.color}">${i+1}</div>
+        <div><div style="font-weight:800">セッション ${i+1}</div>
+        <div class="meta">${items.length}問 ${rec? "・ベスト "+rec.best+"/"+items.length : "・未挑戦"}</div></div>
+        <div class="spacer"></div>
+        <div class="stars">${"★".repeat(stars)}${"☆".repeat(3-stars)}</div>
+      </div>`;
+      card.onclick = ()=>startQuiz({subject, fieldKey, sessionIdx:i, items, name:field.name, book:field.book});
+      list.appendChild(card);
+    }
+    show("sessions");
+  }
+
+  // ---- QUIZ ENGINE ----
+  let quiz=null; // {mode, subject, fieldKey, sessionIdx, name, book, items[], i, correct, combo, maxCombo, pts, answers[]}
+  function startQuiz(cfg){
+    quiz = Object.assign({ i:0, correct:0, combo:0, maxCombo:0, pts:0, answers:[], answered:false, startedAt:Date.now() }, cfg);
+    // prepare shuffled choices per question (fixed for this run)
+    quiz.deck = quiz.items.map(it=>{
+      const choices = shuffle(it.choices);
+      return { it, choices, answerIdx: choices.indexOf(it.answer) };
+    });
+    show("quiz");
+    renderQuestion();
+  }
+  function renderQuestion(){
+    const d = quiz.deck[quiz.i];
+    const it = d.it;
+    const meta = SUBJECT_META[quiz.subject] || {color:"#888"};
+    $("#qtag").style.background = meta.color;
+    $("#qtag").textContent = `${quiz.name}  ${quiz.i+1}/${quiz.deck.length}`;
+    $("#qtext").textContent = it.q;
+    $("#progBar").style.width = Math.round(quiz.i/quiz.deck.length*100)+"%";
+    $("#comboBox").textContent = quiz.combo>=2? ("🔥"+quiz.combo+"れんぞく") : "";
+    const box = $("#choices"); box.innerHTML="";
+    const labels=["A","B","C","D"];
+    d.choices.forEach((c,idx)=>{
+      const b = el("button","choice");
+      b.innerHTML = `<span class="lab">${labels[idx]}</span><span>${esc(c)}</span>`;
+      b.onclick = ()=>answer(idx, b);
+      box.appendChild(b);
+    });
+    $("#feedback").className="feedback";
+    $("#qfoot").classList.add("hide");
+    quiz.answered=false;
+  }
+  function answer(idx, btnEl){
+    if(quiz.answered) return;
+    quiz.answered=true;
+    const d = quiz.deck[quiz.i];
+    const correct = (idx === d.answerIdx);
+    const btns = Array.from($("#choices").children);
+    btns.forEach((b,bi)=>{
+      b.onclick=null;
+      if(bi===d.answerIdx) b.classList.add("ok");
+      else if(bi===idx) b.classList.add("ng");
+      else b.classList.add("dim");
+    });
+    quiz.answers.push({ it:d.it, chosen:d.choices[idx], correct });
+    const fb = $("#feedback"); const head=$("#fbHead"); const body=$("#fbBody");
+    if(correct){
+      quiz.correct++; quiz.combo++; quiz.maxCombo=Math.max(quiz.maxCombo,quiz.combo);
+      const gain = 10 + (quiz.combo>=3? 5:0);
+      quiz.pts += gain;
+      fb.className="feedback good show";
+      head.textContent = quiz.combo>=3? `せいかい！ 🔥${quiz.combo}れんぞく +${gain}pt` : `せいかい！ +${gain}pt`;
+      body.innerHTML = esc(d.it.explain);
+    }else{
+      quiz.combo=0;
+      fb.className="feedback bad show";
+      head.textContent = `おしい！ 正解は「${esc(d.it.answer)}」`;
+      body.innerHTML = esc(d.it.explain);
+      recordWrong(d.it, d.choices[idx]);
+      const bk = bookFor(d.it);
+      if(bk && IS_FILE){
+        const btn = el("button","btn sub small","📖 教科書で見る（"+esc(bk.label)+"）");
+        btn.style.marginTop = "10px";
+        btn.onclick = ()=>openBook(bk, d.it.page);
+        body.appendChild(btn);
+      }
+    }
+    $("#comboBox").textContent = quiz.combo>=2? ("🔥"+quiz.combo+"れんぞく") : "";
+    $("#qfoot").classList.remove("hide");
+    $("#nextBtn").textContent = (quiz.i+1 < quiz.deck.length)? "つぎへ →" : "けっか を みる 🎉";
+    $("#progBar").style.width = Math.round((quiz.i+1)/quiz.deck.length*100)+"%";
+  }
+  $("#nextBtn").onclick = ()=>{
+    if(quiz.i+1 < quiz.deck.length){ quiz.i++; renderQuestion(); }
+    else finishQuiz();
+  };
+  $("#quizQuit").onclick = ()=>{
+    if(confirm("このセッションをやめてホームにもどる？（とちゅうの成績は記録されないよ）")){ show("home"); renderHome(); }
+  };
+
+  function recordWrong(it, chosen){
+    const subj = it._subject || quiz.subject;
+    const fld = it._field || quiz.name;
+    const w = { subject:subj, field:fld, fieldKey:it._fieldKey||quiz.fieldKey||"", q:it.q,
+      choices:it.choices, answer:it.answer, explain:it.explain, chosen:chosen, date:new Date().toISOString() };
+    const k = wrongKey(w);
+    const existing = wrongs.find(x=>wrongKey(x)===k);
+    if(existing){ existing.count=(existing.count||1)+1; existing.chosen=chosen; existing.date=w.date; }
+    else { w.count=1; wrongs.push(w); }
+    save(WRONG_KEY, wrongs);
+  }
+  // 正解したら苦手ノートから減らす（克服）
+  function easeWrong(it){
+    const k = (it._subject||quiz.subject)+"|"+(it._field||quiz.name)+"|"+it.q;
+    const idx = wrongs.findIndex(x=>wrongKey(x)===k);
+    if(idx>=0){ wrongs[idx].count=(wrongs[idx].count||1)-1; if(wrongs[idx].count<=0) wrongs.splice(idx,1); save(WRONG_KEY,wrongs); }
+  }
+
+  function finishQuiz(){
+    const total = quiz.deck.length;
+    const score = quiz.correct;
+    // 正解したものは苦手から1つ減らす（復習・苦手モードの克服用）
+    quiz.answers.forEach(a=>{ if(a.correct) easeWrong(a.it); });
+    // stars
+    let stars=0; const rate=score/total;
+    if(rate>=0.9) stars=3; else if(rate>=0.7) stars=2; else if(rate>=0.5) stars=1;
+    // save progress for real sessions
+    quiz.newlyCleared = false;
+    if(quiz.mode!=="mix" && quiz.mode!=="wrong" && quiz.mode!=="review" && quiz.sessionIdx!=null){
+      const key = progKey(quiz.subject, quiz.fieldKey, quiz.sessionIdx);
+      const prev = progress.sessions[key];
+      const best = prev? Math.max(prev.best, score) : score;
+      const beststars = prev? Math.max(prev.stars, stars) : stars;
+      // ★3（90%以上）を初めて達成したら ごほうび確定
+      if(stars===3 && (!prev || prev.stars<3)) quiz.newlyCleared = true;
+      progress.sessions[key] = { best, stars:beststars, total };
+    }
+    progress.xp += quiz.pts;
+    save(PROG_KEY, progress);
+    // 取り組み履歴を記録（保護者用の「きろく」で使う）
+    const sec = Math.max(0, Math.round((Date.now() - (quiz.startedAt || Date.now())) / 1000));
+    activity.push({ t:new Date().toISOString(), subject:quiz.subject, field:quiz.name,
+      fieldKey:(quiz.fieldKey||null), sessionIdx:(quiz.sessionIdx!=null?quiz.sessionIdx:null),
+      score, total, mode:(quiz.mode||"session"), sec });
+    if(activity.length > 800) activity = activity.slice(-800);
+    save(ACT_KEY, activity);
+    updateHud();
+    renderResult(score, total, stars);
+  }
+
+  function renderResult(score, total, stars){
+    const rate=score/total;
+    $("#rsScore").textContent=score; $("#rsTotal").textContent=total;
+    $("#rsStars").textContent = "★".repeat(stars)+"☆".repeat(3-stars);
+    $("#rsPts").textContent = `+${quiz.pts}pt かくとく！（さいだい🔥${quiz.maxCombo}れんぞく）`;
+    // ごほうび表示（本セッションのみ）
+    const rr=$("#rsReward");
+    const isRealSession = (quiz.mode!=="mix" && quiz.mode!=="wrong" && quiz.mode!=="review" && quiz.sessionIdx!=null);
+    if(isRealSession){
+      const key=progKey(quiz.subject,quiz.fieldKey,quiz.sessionIdx);
+      const alreadyCleared = progress.sessions[key] && progress.sessions[key].stars===3;
+      const need=Math.max(1, Math.ceil(0.9*total)-score);
+      if(quiz.newlyCleared){ rr.style.color="#2f8f2f"; rr.innerHTML=`🪙 90%たっせい！ ＋${REWARD_PER_SESSION}円 ゲット！🎉`; }
+      else if(alreadyCleared){ rr.style.color="#2f8f2f"; rr.innerHTML=`🪙 このセッションは90%クリアずみ（＋${REWARD_PER_SESSION}円）`; }
+      else { rr.style.color="#c26a00"; rr.innerHTML=`🪙 あと <b>${need}問</b> 正解で <b>${REWARD_PER_SESSION}円</b>！ もう一回ちょうせんできるよ`; }
+      rr.style.display="";
+    } else { rr.style.display="none"; rr.innerHTML=""; }
+    let emoji,msg;
+    if(rate>=0.9){emoji="🏆";msg="パーフェクトにちかい！すごい！";}
+    else if(rate>=0.7){emoji="🎉";msg="よくできました！その調子！";}
+    else if(rate>=0.5){emoji="💪";msg="あと少し！まちがえた所を見直そう。";}
+    else {emoji="📖";msg="教科書を見て、もう一度ちょうせんしよう！";}
+    $("#rsEmoji").textContent=emoji; $("#rsMsg").textContent=msg;
+    if(rate>=0.9) confetti();
+    // book line
+    if(quiz.mode==="review" && quiz.reviewPrevRate!=null){
+      const todayRate = total? Math.round(score/total*100):0;
+      const diff = todayRate - quiz.reviewPrevRate;
+      const arrow = diff>0? `⬆ +${diff}%` : (diff<0? `⬇ ${diff}%` : "±0%");
+      const msg = diff>0? "正答率が上がったよ！すごい！" : (diff<0? "もう一回やると上がるよ！" : "キープできたね！");
+      $("#rsBookLine").innerHTML = `📈 ${esc(quiz.reviewDate)}は <b>${quiz.reviewPrevRate}%</b> → きょうは <b>${todayRate}%</b>　<b>${arrow}</b><br>${msg}`;
+    } else if(quiz.book && IS_FILE){
+      $("#rsBookLine").innerHTML = `くわしくは教科書で確認しよう → <a href="#" id="bookLink">${esc(quiz.book.label)} を開く📖</a>`;
+      const bl = $("#bookLink"); if(bl) bl.onclick=(e)=>{ e.preventDefault(); openBook(quiz.book); };
+    } else {
+      $("#rsBookLine").textContent = "まちがえた問題は「苦手ノート」に記録したよ。";
+    }
+    // review
+    const rl = $("#reviewList"); rl.innerHTML="";
+    quiz.answers.forEach((a,idx)=>{
+      const rev = el("div", "rev"+(a.correct?"":" wrong"));
+      let html = `<div class="rq">${idx+1}. ${esc(a.it.q)}</div>`;
+      if(a.correct){
+        html += `<div class="ra"><span class="cor">◯ せいかい：${esc(a.it.answer)}</span></div>`;
+      }else{
+        html += `<div class="ra"><span class="you">✗ あなた：${esc(a.chosen)}</span>　<span class="cor">◯ 正解：${esc(a.it.answer)}</span></div>`;
+      }
+      html += `<div class="ex">💡 ${esc(a.it.explain)}</div>`;
+      rev.innerHTML=html;
+      if(!a.correct){
+        const bk = bookFor(a.it);
+        if(bk && IS_FILE){
+          const btn = el("button","btn sub small","📖 教科書で見る（"+esc(bk.label)+"）");
+          btn.style.marginTop = "8px";
+          btn.onclick = ()=>openBook(bk, a.it.page);
+          rev.appendChild(btn);
+        }
+      }
+      rl.appendChild(rev);
+    });
+    show("result");
+  }
+  $("#againBtn").onclick = ()=>{ startQuiz(quiz); };
+  $("#toSessBtn").onclick = ()=>{
+    if(quiz.mode==="mix"||quiz.mode==="wrong"||quiz.mode==="review"){ show("home"); renderHome(); }
+    else openSessions(quiz.subject, quiz.fieldKey);
+  };
+
+  function openBook(book, page){
+    if(!book){ toast("この問題の教科書は見つかりませんでした"); return; }
+    let url = encodeURI("../教科書/" + book.file);
+    const pg = page || book.page;   // 問題ごとのページ > 分野の先頭ページ
+    if(pg) url += "#page=" + pg;
+    try{ window.open(url, "_blank"); }
+    catch(e){ toast("教科書PDFを開けませんでした"); }
+  }
+  // その問題に対応する教科書（分野の book）を見つける
+  function bookFor(it){
+    if(it && it._book) return it._book;
+    const subj = (it && it._subject) || (quiz && quiz.subject);
+    const fld = (it && it._field) || (quiz && quiz.name);
+    const sub = DATA[subj];
+    if(sub){ const f = sub.fields.find(x=>x.name===fld); if(f) return f.book; }
+    return (quiz && quiz.book) || null;
+  }
+
+  // ---- MIX & WRONG modes ----
+  function allItems(){
+    const out=[];
+    SUBJECT_ORDER.forEach(s=>{ const sub=DATA[s]; if(!sub)return; sub.fields.forEach(f=>{ f.items.forEach(it=>out.push({it, subject:s, field:f.name, fieldKey:f.key, book:f.book})); }); });
+    return out;
+  }
+  $("#btnMix").onclick = ()=>{
+    const pool = shuffle(allItems()).slice(0, SESSION_SIZE);
+    const items = pool.map(p=>Object.assign({_subject:p.subject, _field:p.field, _fieldKey:p.fieldKey}, p.it));
+    startQuiz({ mode:"mix", subject:"ミックス", fieldKey:null, sessionIdx:null, name:"ランダム",
+      book:null, items });
+  };
+
+  function openWrongBook(){
+    $("#wbHint").textContent = wrongs.length
+      ? `いままで ${wrongs.length} 種類の問題をまちがえたよ。「苦手だけ復習」でもう一度ちょうせん！ 正解できると苦手ノートから少しずつへるよ。`
+      : "まだ まちがえた問題はないよ。セッションに挑戦してみよう！";
+    const act = $("#wbActions"); act.innerHTML="";
+    if(wrongs.length){
+      const b1 = el("button","btn primary block","📕 苦手だけ10問 復習する");
+      b1.onclick=()=>startWrongQuiz();
+      const b2 = el("button","btn sub block","💾 苦手リストを書き出す（JSON保存）");
+      b2.onclick=()=>exportWrongs();
+      const b3 = el("button","btn ghost block small","📋 苦手リストをコピー（クロードに渡す用）");
+      b3.onclick=()=>copyWrongs();
+      const b4 = el("button","btn ghost block small","🗑 苦手ノートを空にする");
+      b4.onclick=()=>{ if(confirm("苦手ノートを全部消す？")){ wrongs=[]; save(WRONG_KEY,wrongs); openWrongBook(); toast("消したよ"); } };
+      act.appendChild(b1); act.appendChild(b2); act.appendChild(b3); act.appendChild(b4);
+    }
+    const list = $("#wbList"); list.innerHTML="";
+    if(!wrongs.length){ list.innerHTML=`<div class="empty">🌱 ここに、まちがえた問題がたまっていくよ。<br>苦手を集中的に復習したり、クロードに渡して新しい問題を作ってもらえるよ。</div>`; }
+    else{
+      // sort by count desc
+      wrongs.slice().sort((a,b)=>(b.count||1)-(a.count||1)).forEach(w=>{
+        const n = el("div","wnote");
+        n.innerHTML = `<div class="wq">${esc(w.q)}</div>
+          <div class="wm">${esc(w.subject)}・${esc(w.field)}　正解：<b>${esc(w.answer)}</b>　まちがえた回数：${w.count||1}</div>`;
+        list.appendChild(n);
+      });
+    }
+    show("wrongbook");
+  }
+  $("#btnWrong").onclick = openWrongBook;
+
+  function startWrongQuiz(){
+    // 多くまちがえたものを優先、最大10問
+    const sorted = wrongs.slice().sort((a,b)=>(b.count||1)-(a.count||1));
+    const pick = shuffle(sorted.slice(0, Math.min(20, sorted.length))).slice(0, SESSION_SIZE);
+    const items = pick.map(w=>({ q:w.q, choices:w.choices, answer:w.answer, explain:w.explain,
+      _subject:w.subject, _field:w.field, _fieldKey:w.fieldKey }));
+    startQuiz({ mode:"wrong", subject:"苦手", fieldKey:null, sessionIdx:null, name:"苦手復習", book:null, items });
+  }
+
+  // ---- きのうの復習（前日などにやったセッションを再出題し、正答率の変化を見る） ----
+  function reviewTarget(){
+    const today = dkey(new Date());
+    const byDay = {};
+    activity.forEach(a=>{
+      if((a.mode==="session"||!a.mode) && a.fieldKey && a.sessionIdx!=null){
+        const k = dkey(a.t); (byDay[k]=byDay[k]||[]).push(a);
+      }
+    });
+    const days = Object.keys(byDay).filter(k=>k<today).sort().reverse();  // 今日より前で最新
+    if(!days.length) return null;
+    return { date:days[0], recs:byDay[days[0]] };
+  }
+  function startReviewQuiz(){
+    const tgt = reviewTarget();
+    if(!tgt){ toast("きのう以前にやったセッションがまだないよ"); return; }
+    const seen={}; let prevS=0, prevT=0; const sessKeys=[];
+    tgt.recs.forEach(a=>{
+      const k=a.subject+"|"+a.fieldKey+"|"+a.sessionIdx;
+      if(!seen[k]){ seen[k]=true; sessKeys.push({subject:a.subject, fieldKey:a.fieldKey, sessionIdx:a.sessionIdx}); }
+      prevS+=a.score; prevT+=a.total;
+    });
+    let items=[];
+    sessKeys.forEach(s=>{
+      const f=getField(s.subject, s.fieldKey); if(!f) return;
+      sessionItems(f, s.sessionIdx).forEach(it=>items.push(Object.assign({_subject:s.subject,_field:f.name,_fieldKey:s.fieldKey}, it)));
+    });
+    if(!items.length){ toast("復習できる問題が見つからなかったよ"); return; }
+    if(items.length>20) items = shuffle(items).slice(0,20);
+    const prevRate = prevT? Math.round(prevS/prevT*100):0;
+    const [, mm, dd] = tgt.date.split("-");
+    startQuiz({ mode:"review", subject:"復習", fieldKey:null, sessionIdx:null,
+      name:`${+mm}/${+dd} の復習`, book:null, items,
+      reviewPrevRate:prevRate, reviewDate:`${+mm}/${+dd}` });
+  }
+  $("#btnReview").onclick = startReviewQuiz;
+
+  function exportWrongs(){
+    const payload = { exportedAt:new Date().toISOString(), target:"きそがため", count:wrongs.length, items:wrongs };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href=url; a.download="苦手リスト.json"; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 1000);
+    toast("苦手リスト.json を保存したよ");
+  }
+  function copyWrongs(){
+    const text = wrongs.map(w=>`【${w.subject}・${w.field}】${w.q.replace(/\n/g," ")}（正解：${w.answer}／まちがえた回数：${w.count||1}）`).join("\n");
+    const full = "次の問題をよくまちがえます。同じ分野・レベルの新しい4択問題を作ってください。\n\n"+text;
+    try{ navigator.clipboard.writeText(full).then(()=>toast("コピーしたよ！クロードに貼りつけてね")); }
+    catch(e){ toast("コピーできませんでした"); }
+  }
+
+  // ---- PARENT / きろく ----
+  function dkey(d){ const x=new Date(d); return x.getFullYear()+"-"+String(x.getMonth()+1).padStart(2,"0")+"-"+String(x.getDate()).padStart(2,"0"); }
+  function fmtDT(iso){ const x=new Date(iso); const p=n=>String(n).padStart(2,"0"); return `${x.getMonth()+1}/${x.getDate()} ${p(x.getHours())}:${p(x.getMinutes())}`; }
+  function sum(arr,f){ return arr.reduce((s,a)=>s+(f(a)||0),0); }
+
+  function currentStreak(){
+    const days=new Set(activity.map(a=>dkey(a.t)));
+    let d=new Date(); if(!days.has(dkey(d))) d.setDate(d.getDate()-1);
+    let s=0; while(days.has(dkey(d))){ s++; d.setDate(d.getDate()-1); } return s;
+  }
+  // 連続日数のかたまりの数（7日続くごとに1。14日なら2）
+  function streakBlocks(){
+    const days=[...new Set(activity.map(a=>dkey(a.t)))].sort();
+    if(!days.length) return 0;
+    let blocks=0, run=1;
+    for(let i=1;i<days.length;i++){
+      const diff=Math.round((new Date(days[i]) - new Date(days[i-1]))/86400000);
+      if(diff===1) run++; else { blocks+=Math.floor(run/STREAK_DAYS); run=1; }
+    }
+    blocks+=Math.floor(run/STREAK_DAYS);
+    return blocks;
+  }
+  function allSessionTotal(){ let t=0; SUBJECT_ORDER.forEach(s=>{const sub=DATA[s]; if(sub)sub.fields.forEach(f=>t+=sessionCount(f));}); return t; }
+  // ごほうび合計（90%クリア数×単価 ＋ 連続ボーナス）
+  function rewardTotals(){
+    let cleared90=0;
+    Object.values(progress.sessions).forEach(s=>{ if(s && s.stars===3) cleared90++; });
+    const money90 = cleared90 * REWARD_PER_SESSION;
+    const blocks = streakBlocks();
+    const moneyStreak = blocks * STREAK_REWARD;
+    return { cleared90, money90, blocks, moneyStreak, total: money90+moneyStreak };
+  }
+  function renderRewardMeter(){
+    const m=$("#rewardMeter"); if(!m) return;
+    const r=rewardTotals(); const totalSess=allSessionTotal(); const cs=currentStreak();
+    const toNext = (cs%STREAK_DAYS===0)? STREAK_DAYS : (STREAK_DAYS - cs%STREAK_DAYS);
+    const justEarned = (cs>0 && cs%STREAK_DAYS===0);
+    const streakMsg = justEarned
+      ? `🔥 ${cs}日れんぞく！ ＋${STREAK_REWARD}円ゲット！`
+      : `🔥 連続${cs}日・あと<b>${toNext}日</b>つづけると ＋${STREAK_REWARD}円！`;
+    m.innerHTML = `<div class="card" style="cursor:default;background:linear-gradient(135deg,#fff3dd,#ffffff)">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="font-size:30px">🪙</div>
+        <div>
+          <div style="font-weight:800;font-size:17px">ためたごほうび <span style="color:var(--accent)">${r.total}円</span></div>
+          <div style="font-size:12.5px;color:var(--sub)">90%クリア ${r.cleared90}／${totalSess}こ（×${REWARD_PER_SESSION}円）</div>
+        </div>
+      </div>
+      <div style="margin-top:9px;font-size:13px;font-weight:700;color:#c26a00">${streakMsg}</div>
+    </div>`;
+  }
+
+  function openParent(){
+    const totalQ = sum(activity,a=>a.total);
+    const totalC = sum(activity,a=>a.score);
+    const rate = totalQ? Math.round(totalC/totalQ*100) : 0;
+    const mins = Math.round(sum(activity,a=>a.sec)/60);
+    const days = new Set(activity.map(a=>dkey(a.t))).size;
+    const today = dkey(new Date());
+    const todayQ = sum(activity.filter(a=>dkey(a.t)===today), a=>a.total);
+    const lv = 1 + Math.floor(progress.xp/100);
+    $("#pSummary").innerHTML = `<div class="stats">
+      <div class="stat"><b>${activity.length}</b><span>セッション</span></div>
+      <div class="stat"><b>${totalQ}</b><span>といた問題</span></div>
+      <div class="stat"><b>${rate}%</b><span>正答率</span></div>
+      <div class="stat"><b>${mins}</b><span>学習時間（分）</span></div>
+      <div class="stat"><b>${days}</b><span>学習した日数</span></div>
+      <div class="stat"><b>${currentStreak()}</b><span>れんぞく日数</span></div>
+    </div>
+    <p class="hint" style="margin-top:10px">きょうは <b>${todayQ}</b> 問・レベル <b>${lv}</b>（⭐は進み具合のページで確認できます）。</p>`;
+
+    // ごほうび合計
+    const rw=rewardTotals();
+    $("#pReward").innerHTML = `<div class="card" style="cursor:default;background:linear-gradient(135deg,#fff3dd,#ffffff)">
+      <div style="font-weight:800;font-size:18px">🪙 ごほうび合計：<span style="color:var(--accent)">${rw.total}円</span></div>
+      <div style="font-size:13px;color:#5a6470;margin-top:6px;line-height:1.9">
+        ・90%クリア <b>${rw.cleared90}</b> こ × ${REWARD_PER_SESSION}円 ＝ <b>${rw.money90}円</b><br>
+        ・${STREAK_DAYS}日連続ボーナス <b>${rw.blocks}</b> 回 × ${STREAK_REWARD}円 ＝ <b>${rw.moneyStreak}円</b>
+      </div></div>`;
+
+    // ヒートマップ（さいきん21日）
+    const cnt={}; activity.forEach(a=>{ const k=dkey(a.t); cnt[k]=(cnt[k]||0)+(a.total||0); });
+    let heat=""; const wd=["日","月","火","水","木","金","土"];
+    for(let i=20;i>=0;i--){
+      const d=new Date(); d.setDate(d.getDate()-i); const k=dkey(d); const c=cnt[k]||0;
+      let bg="#eee4d4", col="#9a8f7d";
+      if(c>0){ bg="#cdeec0"; col="#2f7d32"; }
+      if(c>=10){ bg="#9fdc8e"; }
+      if(c>=30){ bg="#54b85a"; col="#fff"; }
+      const lbl = (i===20||d.getDate()===1||i%7===0)? `<small>${d.getMonth()+1}/${d.getDate()}</small>`:"";
+      heat += `<div class="d" title="${k}：${c}問" style="background:${bg};color:${col}">${lbl}${c||""}</div>`;
+    }
+    $("#pHeat").innerHTML = `<div class="heat">${heat}</div>`;
+
+    // 正答率のうつりかわり（やった日ごと、最大10日）
+    const byd={};
+    activity.forEach(a=>{ const k=dkey(a.t); (byd[k]=byd[k]||{s:0,t:0}); byd[k].s+=a.score; byd[k].t+=a.total; });
+    const dayList=Object.keys(byd).sort().slice(-10);
+    let th="";
+    dayList.forEach(k=>{ const o=byd[k]; const r=o.t?Math.round(o.s/o.t*100):0; const parts=k.split("-");
+      th += `<div style="display:flex;align-items:center;gap:8px;font-size:12.5px">
+        <span style="min-width:46px;color:var(--sub)">${+parts[1]}/${+parts[2]}</span>
+        <div style="flex:1;height:10px;background:#eee4d4;border-radius:999px;overflow:hidden"><i style="display:block;height:100%;width:${r}%;background:linear-gradient(90deg,var(--accent2),var(--accent));border-radius:999px"></i></div>
+        <b style="min-width:40px;text-align:right">${r}%</b></div>`; });
+    $("#pTrend").innerHTML = dayList.length? th : `<div class="empty">まだデータがありません。</div>`;
+
+    // 教科べつ
+    const bs = $("#pBySubject"); bs.innerHTML="";
+    const groups = [["国語","var(--kokugo)"],["理科","var(--rika)"],["社会","var(--shakai)"],["そのほか（ミックス・苦手）","#8a8a8a"]];
+    groups.forEach(([label,color])=>{
+      let recs;
+      if(label.startsWith("そのほか")) recs = activity.filter(a=>!["国語","理科","社会"].includes(a.subject));
+      else recs = activity.filter(a=>a.subject===label);
+      if(!recs.length && label.startsWith("そのほか")) return;
+      const q=sum(recs,a=>a.total), c=sum(recs,a=>a.score), r=q?Math.round(c/q*100):0;
+      // クリア済みセッション数（進み具合）
+      let cleared=0, totalSess=0;
+      if(["国語","理科","社会"].includes(label)){
+        const sub=DATA[label];
+        if(sub){ sub.fields.forEach(f=>{ const sc=sessionCount(f); totalSess+=sc; for(let i=0;i<sc;i++){ if(progress.sessions[progKey(label,f.key,i)]) cleared++; } }); }
+      }
+      const div=el("div","subjstat");
+      div.innerHTML = `<div style="display:flex;align-items:center;gap:8px">
+        <b style="color:${color}">${esc(label)}</b>
+        <span style="margin-left:auto;font-size:12px;color:var(--sub)">${recs.length}回・${q}問・正答率${r}%${totalSess?`・クリア ${cleared}/${totalSess}`:""}</span></div>
+        <div class="bar"><i style="width:${r}%;background:${color}"></i></div>`;
+      bs.appendChild(div);
+    });
+
+    // さいきんの取り組み（新しい順 15件）
+    const hist=$("#pHistory"); hist.innerHTML="";
+    const recent = activity.slice().reverse().slice(0,15);
+    if(!recent.length){ hist.innerHTML=`<div class="empty">まだ取り組みの記録がありません。</div>`; }
+    else{
+      const wrap=el("div","hist");
+      recent.forEach(a=>{
+        const r=el("div","hrow");
+        const rate2 = a.total? Math.round(a.score/a.total*100):0;
+        r.innerHTML = `<span class="hd">${fmtDT(a.t)}</span>
+          <span>${esc(a.subject)}・${esc(a.field)}</span>
+          <span class="hs">${a.score}/${a.total}（${rate2}%）</span>`;
+        wrap.appendChild(r);
+      });
+      hist.appendChild(wrap);
+    }
+    show("parent");
+  }
+  // 「きろく」はおうちの人用。パスワードで開く（簡易ロック。一度合えばアプリを閉じるまで開ける）
+  const PARENT_PASS = "8336";
+  let parentUnlocked = false;
+  $("#btnParent").onclick = ()=>{
+    if(!parentUnlocked){
+      const inp = prompt("おうちの人用のパスワードを入れてください");
+      if(inp === null) return;               // キャンセル
+      if(inp.trim() !== PARENT_PASS){ toast("パスワードがちがうよ"); return; }
+      parentUnlocked = true;
+    }
+    openParent();
+  };
+  $("#pExport").onclick = ()=>{
+    const head = "日時,教科,分野,正解,問題数,正答率(%),所要秒\n";
+    const rows = activity.map(a=>{
+      const r=a.total?Math.round(a.score/a.total*100):0;
+      const dt=new Date(a.t); const p=n=>String(n).padStart(2,"0");
+      const ds=`${dt.getFullYear()}/${p(dt.getMonth()+1)}/${p(dt.getDate())} ${p(dt.getHours())}:${p(dt.getMinutes())}`;
+      return `${ds},${a.subject},${a.field},${a.score},${a.total},${r},${a.sec||0}`;
+    }).join("\n");
+    const blob = new Blob(["﻿"+head+rows], {type:"text/csv;charset=utf-8"});
+    const url=URL.createObjectURL(blob); const el2=document.createElement("a");
+    el2.href=url; el2.download="学習きろく.csv"; document.body.appendChild(el2); el2.click(); el2.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000); toast("学習きろく.csv を保存したよ");
+  };
+  $("#pClear").onclick = ()=>{
+    if(confirm("日々の取り組み履歴を消しますか？（★やベスト点などの進み具合は残ります）")){
+      activity=[]; save(ACT_KEY,activity); openParent(); toast("履歴を消したよ");
+    }
+  };
+
+  // ---- confetti ----
+  function confetti(){
+    const ems=["🎉","⭐","✨","🎊","🌟"];
+    for(let i=0;i<24;i++){
+      const s=el("span","confetti",ems[i%ems.length]);
+      s.style.left=Math.random()*100+"vw";
+      s.style.animationDuration=(1.6+Math.random()*1.4)+"s";
+      s.style.fontSize=(16+Math.random()*16)+"px";
+      document.body.appendChild(s);
+      setTimeout(()=>s.remove(),3200);
+    }
+  }
+
+  // ---- nav backs ----
+  document.querySelectorAll("[data-go]").forEach(b=>{
+    b.onclick=()=>{ const g=b.getAttribute("data-go");
+      if(g==="home"){ show("home"); renderHome(); }
+      else if(g==="fields"){ openFields(curSubject); }
+    };
+  });
+
+  // ---- init ----
+  if(!DATA || !Object.keys(DATA).length){
+    document.querySelector(".wrap").innerHTML = '<div class="empty">問題データが読みこめませんでした。data フォルダのファイルがあるか確認してね。</div>';
+  } else {
+    renderHome();
+  }
+})();
+</script>
+</body>
+</html>
