@@ -302,7 +302,21 @@
     return sub.fields.find(f=>f.key===fieldKey) || null;
   }
   function sessionCount(field){ return Math.max(1, Math.ceil(field.items.length / SESSION_SIZE)); }
-  function sessionItems(field, idx){ return field.items.slice(idx*SESSION_SIZE, idx*SESSION_SIZE+SESSION_SIZE); }
+  function sessionItems(field, idx){
+    const all = field.items;
+    let slice = all.slice(idx*SESSION_SIZE, idx*SESSION_SIZE+SESSION_SIZE);
+    if(slice.length < SESSION_SIZE && all.length){
+      // 最後の短いセッションは、その分野の先頭から問題を補充して必ず10問にする
+      const used = new Set(slice.map(it=>it.q));
+      for(let i=0; i<all.length && slice.length<SESSION_SIZE; i++){
+        if(!used.has(all[i].q)){ slice.push(all[i]); used.add(all[i].q); }
+      }
+      // 分野の問題数が10未満なら、同じ問題をくり返して10問にする
+      let i=0;
+      while(slice.length<SESSION_SIZE){ slice.push(all[i % all.length]); i++; }
+    }
+    return slice;
+  }
   function progKey(subject, fieldKey, idx){ return subject+"|"+fieldKey+"|"+idx; }
   function wrongKey(w){ return w.subject+"|"+w.field+"|"+w.q; }
 
