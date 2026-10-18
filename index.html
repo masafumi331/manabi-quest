@@ -228,9 +228,20 @@
     <div id="pBySubject" class="grid"></div>
     <h2 class="title" style="margin-top:18px;font-size:16px">🕑 さいきんの取り組み</h2>
     <div id="pHistory"></div>
+    <h2 class="title" style="margin-top:18px;font-size:16px">💾 バックアップ（Dropbox保存）</h2>
+    <p class="hint" id="bkStatus"></p>
+    <div class="grid">
+      <button class="btn primary block small" id="bkPick">📁 保存先フォルダを選ぶ（自動保存オン）</button>
+      <button class="btn sub block small" id="bkExcel">💾 エクセルで保存（今すぐ）</button>
+      <button class="btn ghost block small" id="bkJson">🧷 バックアップ(JSON)を保存</button>
+      <button class="btn ghost block small" id="bkRestore">📂 バックアップから復元</button>
+      <input type="file" id="bkFile" accept=".json,application/json" style="display:none">
+    </div>
+    <p class="hint">消えても大丈夫なように、ときどき保存してね。自動保存をオンにすると、セッションのたびに「学習データ.xls（エクセル）」と「学習データ.json（復元用）」がそのフォルダへ書き込まれます。</p>
+
     <div class="grid" style="margin-top:14px">
-      <button class="btn sub block small" id="pExport">💾 記録を書き出す（CSV保存）</button>
-      <button class="btn ghost block small" id="pClear">🗑 記録を消す</button>
+      <button class="btn ghost block small" id="pExport">📄 履歴だけCSVで保存</button>
+      <button class="btn ghost block small" id="pClear">🗑 記録（履歴）を消す</button>
     </div>
     <p class="hint" style="margin-top:8px">※「★・ベスト点」などの進み具合は消えません。消えるのは日々の取り組み履歴だけです。</p>
   </section>
@@ -379,8 +390,14 @@
   // ---- QUIZ ENGINE ----
   let quiz=null; // {mode, subject, fieldKey, sessionIdx, name, book, items[], i, correct, combo, maxCombo, pts, answers[]}
   function startQuiz(cfg){
-    quiz = Object.assign({ i:0, correct:0, combo:0, maxCombo:0, pts:0, answers:[], answered:false, startedAt:Date.now() }, cfg);
-    // prepare shuffled choices per question (fixed for this run)
+    // cfg（設定）だけを引き継ぎ、スコアなどの状態は必ず初期化する。
+    // ※「もう一度」で cfg に前回の quiz を渡しても、ここで全部リセットされるので
+    //   10問まるごとやり直しになり、スコアの持ち越し（例: 11/10）も起きない。
+    quiz = Object.assign({}, cfg);
+    quiz.i = 0; quiz.correct = 0; quiz.combo = 0; quiz.maxCombo = 0; quiz.pts = 0;
+    quiz.answers = []; quiz.answered = false; quiz.newlyCleared = false;
+    quiz.startedAt = Date.now();
+    // 毎回シャッフルし直して10問すべてを出題
     quiz.deck = quiz.items.map(it=>{
       const choices = shuffle(it.choices);
       return { it, choices, answerIdx: choices.indexOf(it.answer) };
@@ -504,6 +521,7 @@
     if(activity.length > 800) activity = activity.slice(-800);
     save(ACT_KEY, activity);
     updateHud();
+    autoBackup();   // 自動保存フォルダが設定済みなら Dropbox に書き出す
     renderResult(score, total, stars);
   }
 
@@ -843,6 +861,7 @@
       });
       hist.appendChild(wrap);
     }
+    renderBackupStatus();
     show("parent");
   }
   // 「きろく」はおうちの人用。パスワードで開く（簡易ロック。一度合えばアプリを閉じるまで開ける）
@@ -876,6 +895,145 @@
     }
   };
 
+  // ======== バックアップ（Excel/JSON保存・Dropbox自動保存・復元） ========
+  function subjectOfKey(k){ return k.split("|")[0]; }
+  function fieldNameOf(subject, fieldKey){
+    const sub=DATA[subject]; if(sub){ const f=sub.fields.find(x=>x.key===fieldKey); if(f) return f.name; } return fieldKey;
+  }
+  function fullState(){
+    return { app:"manabi-quest", savedAt:new Date().toISOString(),
+      progress, activity, wrongs };
+  }
+  function xmlEsc(s){ return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+  function cell(v){
+    if(typeof v==="number" && isFinite(v)) return `<Cell><Data ss:Type="Number">${v}</Data></Cell>`;
+    return `<Cell><Data ss:Type="String">${xmlEsc(v==null?"":v)}</Data></Cell>`;
+  }
+  function row(cells){ return `<Row>${cells.map(cell).join("")}</Row>`; }
+  function sheet(name, rows){ return `<Worksheet ss:Name="${xmlEsc(name)}"><Table>${rows.join("")}</Table></Worksheet>`; }
+  function buildExcelXml(){
+    const rw=rewardTotals(); const totalSess=allSessionTotal();
+    const totalQ=sum(activity,a=>a.total), totalC=sum(activity,a=>a.score);
+    const rate=totalQ?Math.round(totalC/totalQ*100):0;
+    const mins=Math.round(sum(activity,a=>a.sec)/60);
+    const days=new Set(activity.map(a=>dkey(a.t))).size;
+    const lv=1+Math.floor(progress.xp/100);
+    const now=new Date(); const p=n=>String(n).padStart(2,"0");
+    const nowStr=`${now.getFullYear()}/${p(now.getMonth()+1)}/${p(now.getDate())} ${p(now.getHours())}:${p(now.getMinutes())}`;
+    // サマリー
+    const s1=[
+      row(["更新日時", nowStr]),
+      row(["ごほうび合計（円）", rw.total]),
+      row(["　90%クリア数", rw.cleared90]),
+      row(["　1セッション単価（円）", REWARD_PER_SESSION]),
+      row(["　90%ごほうび（円）", rw.money90]),
+      row([`　${STREAK_DAYS}日連続ボーナス回数`, rw.blocks]),
+      row(["　連続ボーナス（円）", rw.moneyStreak]),
+      row(["クリア済みセッション", Object.values(progress.sessions).filter(x=>x).length]),
+      row(["全セッション数", totalSess]),
+      row(["のべ取り組み回数", activity.length]),
+      row(["のべ問題数", totalQ]),
+      row(["正答率（％）", rate]),
+      row(["学習時間（分）", mins]),
+      row(["学習した日数", days]),
+      row(["いまの連続日数", currentStreak()]),
+      row(["レベル", lv]),
+    ];
+    // 進み具合（セッション別）
+    const s2=[ row(["教科","分野","セッション番号","ベスト","満点","★","90%クリア"]) ];
+    Object.keys(progress.sessions).sort().forEach(k=>{
+      const o=progress.sessions[k]; if(!o) return;
+      const parts=k.split("|"); const subj=parts[0], fk=parts[1], idx=(+parts[2])+1;
+      s2.push(row([subj, fieldNameOf(subj,fk), idx, o.best, o.total||10, o.stars, (o.stars===3?"○":"")]));
+    });
+    // 取り組み履歴
+    const s3=[ row(["日時","教科","分野","正解","問題数","正答率(%)","所要秒"]) ];
+    activity.forEach(a=>{
+      const d=new Date(a.t); const ds=`${d.getFullYear()}/${p(d.getMonth()+1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+      const r=a.total?Math.round(a.score/a.total*100):0;
+      s3.push(row([ds, a.subject, a.field, a.score, a.total, r, a.sec||0]));
+    });
+    return `<?xml version="1.0" encoding="UTF-8"?>\n<?mso-application progid="Excel.Sheet"?>\n`+
+      `<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">`+
+      sheet("サマリー",s1)+sheet("進み具合",s2)+sheet("取り組み履歴",s3)+`</Workbook>`;
+  }
+  function downloadText(name, text, mime){
+    const blob=new Blob(["﻿"+text],{type:mime}); const url=URL.createObjectURL(blob);
+    const a=document.createElement("a"); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }
+  // --- 自動保存フォルダ（File System Access API / Chrome・Edge） ---
+  const FS_OK = (typeof window.showDirectoryPicker === "function");
+  function idb(){ return new Promise((res,rej)=>{ const r=indexedDB.open("mq-backup",1);
+    r.onupgradeneeded=()=>r.result.createObjectStore("kv"); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
+  async function idbSet(k,v){ const db=await idb(); return new Promise((res,rej)=>{ const t=db.transaction("kv","readwrite"); t.objectStore("kv").put(v,k); t.oncomplete=()=>res(); t.onerror=()=>rej(t.error); }); }
+  async function idbGet(k){ const db=await idb(); return new Promise((res,rej)=>{ const t=db.transaction("kv","readonly"); const q=t.objectStore("kv").get(k); q.onsuccess=()=>res(q.result); q.onerror=()=>rej(q.error); }); }
+  let backupDir=null;
+  async function loadBackupDir(){ if(!FS_OK) return; try{ backupDir=await idbGet("dir")||null; }catch(e){ backupDir=null; } }
+  async function pickBackupDir(){
+    if(!FS_OK){ toast("このブラウザは自動保存に未対応（Chrome/Edge推奨）"); return; }
+    try{
+      const dir=await window.showDirectoryPicker({mode:"readwrite"});
+      backupDir=dir; await idbSet("dir",dir);
+      await writeBackup(true);
+      renderBackupStatus(); toast("自動保存をオンにしたよ");
+    }catch(e){ /* キャンセル等 */ }
+  }
+  async function dirUsable(){
+    if(!backupDir) return false;
+    try{ const q=await backupDir.queryPermission({mode:"readwrite"});
+      if(q==="granted") return true;
+      if(q==="prompt"){ const r=await backupDir.requestPermission({mode:"readwrite"}); return r==="granted"; }
+    }catch(e){}
+    return false;
+  }
+  async function writeFileTo(dir, name, text){
+    const fh=await dir.getFileHandle(name,{create:true}); const w=await fh.createWritable();
+    await w.write("﻿"+text); await w.close();
+  }
+  async function writeBackup(showToast){
+    if(!(await dirUsable())) return false;
+    try{
+      await writeFileTo(backupDir, "学習データ.xls", buildExcelXml());
+      await writeFileTo(backupDir, "学習データ.json", JSON.stringify(fullState(),null,2));
+      if(showToast) toast("Dropboxフォルダに保存したよ");
+      return true;
+    }catch(e){ if(showToast) toast("自動保存に失敗しました"); return false; }
+  }
+  // セッション終了時に自動保存（フォルダ設定済みのときだけ）
+  function autoBackup(){ if(backupDir) writeBackup(false); }
+  function renderBackupStatus(){
+    const el2=$("#bkStatus"); if(!el2) return;
+    if(!FS_OK){ el2.innerHTML=`<span style="color:var(--sub)">自動保存はChrome/Edgeで使えます。下の「エクセルで保存」でDropboxに手動保存できます。</span>`; return; }
+    el2.innerHTML = backupDir
+      ? `<span style="color:var(--ok);font-weight:700">✓ 自動保存オン</span>（${esc(backupDir.name)} フォルダ）・セッションごとに保存されます`
+      : `<span style="color:var(--sub)">自動保存はオフ。「保存先フォルダを選ぶ」でDropbox内の学習アプリフォルダを選ぶと、以後じどうで保存します。</span>`;
+  }
+  function restoreFromObj(obj){
+    if(!obj || obj.app!=="manabi-quest"){ toast("このファイルは復元できません"); return; }
+    if(obj.progress){ progress=obj.progress; if(!progress.sessions)progress.sessions={}; if(typeof progress.xp!=="number")progress.xp=0; save(PROG_KEY,progress); }
+    if(Array.isArray(obj.activity)){ activity=obj.activity; save(ACT_KEY,activity); }
+    if(Array.isArray(obj.wrongs)){ wrongs=obj.wrongs; save(WRONG_KEY,wrongs); }
+    updateHud(); openParent(); toast("バックアップから復元したよ");
+  }
+  $("#bkPick").onclick = pickBackupDir;
+  $("#bkExcel").onclick = async ()=>{
+    if(backupDir && await writeBackup(true)) return;
+    downloadText("学習データ.xls", buildExcelXml(), "application/vnd.ms-excel");
+    toast("学習データ.xls を保存したよ");
+  };
+  $("#bkJson").onclick = async ()=>{
+    if(backupDir) await writeBackup(false);
+    downloadText("学習データ.json", JSON.stringify(fullState(),null,2), "application/json");
+    toast("学習データ.json を保存したよ");
+  };
+  $("#bkRestore").onclick = ()=> $("#bkFile").click();
+  $("#bkFile").onchange = (e)=>{ const f=e.target.files[0]; if(!f) return;
+    const r=new FileReader();
+    r.onload=()=>{ try{ restoreFromObj(JSON.parse(r.result)); }catch(err){ toast("読み込みに失敗しました"); } };
+    r.readAsText(f); e.target.value="";
+  };
+
   // ---- confetti ----
   function confetti(){
     const ems=["🎉","⭐","✨","🎊","🌟"];
@@ -902,6 +1060,7 @@
     document.querySelector(".wrap").innerHTML = '<div class="empty">問題データが読みこめませんでした。data フォルダのファイルがあるか確認してね。</div>';
   } else {
     renderHome();
+    loadBackupDir();
   }
 })();
 </script>
