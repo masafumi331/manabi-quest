@@ -299,6 +299,7 @@
   if(typeof progress.xp !== "number") progress.xp = 0;
   if(!progress.reviewTries) progress.reviewTries = {};     // 復習の挑戦回数（キー: 元の日付|教科|分野|番号）
   if(!progress.reviewRewards) progress.reviewRewards = {}; // 復習でもらった金額（同じキー。0円でも記録＝決着ずみ）
+  if(!Array.isArray(progress.payments)) progress.payments = []; // おうちの人が支払った記録 [{t, amount}]
   let wrongs = load(WRONG_KEY, []);
   if(!Array.isArray(wrongs)) wrongs = [];
   let activity = load(ACT_KEY, []);   // 取り組み履歴（保護者用）
@@ -861,7 +862,9 @@
     const rv = Object.values(progress.reviewRewards||{});
     const reviewCount = rv.filter(v=>v>0).length;
     const moneyReview = rv.reduce((s,v)=>s+(v||0),0);
-    return { cleared90, money90, blocks, moneyStreak, reviewCount, moneyReview, total: money90+moneyStreak+moneyReview };
+    const total = money90+moneyStreak+moneyReview;            // これまでの累計（支払った分もふくむ）
+    const paid = (progress.payments||[]).reduce((s,p)=>s+(p.amount||0),0);
+    return { cleared90, money90, blocks, moneyStreak, reviewCount, moneyReview, total, paid, unpaid: Math.max(0, total-paid) };
   }
   function renderRewardMeter(){
     const m=$("#rewardMeter"); if(!m) return;
@@ -875,7 +878,8 @@
       <div style="display:flex;align-items:center;gap:12px">
         <div style="font-size:30px">🪙</div>
         <div>
-          <div style="font-weight:800;font-size:17px">ためたごほうび <span style="color:var(--accent)">${r.total}円</span></div>
+          <div style="font-weight:800;font-size:17px">まだもらっていない <span style="color:var(--accent)">${r.unpaid}円</span></div>
+          <div style="font-size:12.5px;font-weight:700">これまでの合計 ${r.total}円（もらった分 ${r.paid}円）</div>
           <div style="font-size:12.5px;color:var(--sub)">90%クリア ${r.cleared90}／${totalSess}こ（×${REWARD_PER_SESSION}円）${r.moneyReview? `・復習 ${r.moneyReview}円`:""}</div>
         </div>
       </div>
@@ -905,12 +909,37 @@
     // ごほうび合計
     const rw=rewardTotals();
     $("#pReward").innerHTML = `<div class="card" style="cursor:default;background:linear-gradient(135deg,#fff3dd,#ffffff)">
-      <div style="font-weight:800;font-size:18px">🪙 ごほうび合計：<span style="color:var(--accent)">${rw.total}円</span></div>
+      <div style="font-weight:800;font-size:18px">🪙 未払い：<span style="color:var(--accent)">${rw.unpaid}円</span></div>
+      <div style="font-size:13px;font-weight:700;margin-top:2px">累計 ${rw.total}円 ／ 支払いずみ ${rw.paid}円</div>
       <div style="font-size:13px;color:#5a6470;margin-top:6px;line-height:1.9">
         ・90%クリア <b>${rw.cleared90}</b> こ × ${REWARD_PER_SESSION}円 ＝ <b>${rw.money90}円</b><br>
         ・${STREAK_DAYS}日連続ボーナス <b>${rw.blocks}</b> 回 × ${STREAK_REWARD}円 ＝ <b>${rw.moneyStreak}円</b><br>
         ・前日の復習クリア <b>${rw.reviewCount}</b> こ（1回目${REVIEW_REWARD[0]}円・2回目${REVIEW_REWARD[1]}円）＝ <b>${rw.moneyReview}円</b>
-      </div></div>`;
+      </div>
+      <div class="grid" style="margin-top:10px" id="payBtns"></div>
+      <div id="payHist" style="font-size:12.5px;color:#5a6470;margin-top:8px;line-height:1.8"></div>
+      </div>`;
+    const pb=$("#payBtns");
+    const bPay=el("button","btn primary block small",`💴 ${rw.unpaid}円 支払った（未払いを0にする）`);
+    bPay.disabled = rw.unpaid<=0;
+    bPay.onclick=()=>{
+      const amt=rewardTotals().unpaid; if(amt<=0) return;
+      if(!confirm(`${amt}円を支払ったことにして、未払いを0円にしますか？\n（累計の金額はそのまま残ります）`)) return;
+      progress.payments.push({ t:new Date().toISOString(), amount:amt });
+      save(PROG_KEY, progress); autoBackup(); openParent(); toast(`${amt}円 支払いずみにしたよ`);
+    };
+    pb.appendChild(bPay);
+    if(progress.payments.length){
+      const last=progress.payments[progress.payments.length-1];
+      const bUndo=el("button","btn ghost block small",`↩ さいごの支払い（${fmtDT(last.t)}・${last.amount}円）を取り消す`);
+      bUndo.onclick=()=>{
+        if(!confirm(`${fmtDT(last.t)} の ${last.amount}円の支払いを取り消しますか？`)) return;
+        progress.payments.pop(); save(PROG_KEY, progress); autoBackup(); openParent(); toast("取り消したよ");
+      };
+      pb.appendChild(bUndo);
+      $("#payHist").innerHTML = "支払いの記録：<br>" + progress.payments.slice().reverse().slice(0,10)
+        .map(p=>`・${fmtDT(p.t)}　${p.amount}円`).join("<br>");
+    }
 
     // ヒートマップ（さいきん21日）
     const cnt={}; activity.forEach(a=>{ const k=dkey(a.t); cnt[k]=(cnt[k]||0)+(a.total||0); });
@@ -1039,7 +1068,9 @@
     // サマリー
     const s1=[
       row(["更新日時", nowStr]),
-      row(["ごほうび合計（円）", rw.total]),
+      row(["ごほうび累計（円）", rw.total]),
+      row(["　支払いずみ（円）", rw.paid]),
+      row(["　未払い（円）", rw.unpaid]),
       row(["　90%クリア数", rw.cleared90]),
       row(["　1セッション単価（円）", REWARD_PER_SESSION]),
       row(["　90%ごほうび（円）", rw.money90]),
