@@ -136,6 +136,7 @@
   <!-- HOME -->
   <section id="home">
     <h2 class="title">📚 きょうは どれを べんきょうする？</h2>
+    <p class="hint" style="font-weight:800;color:#c26a00;font-size:14px">🚀 どんどん進めると問題が追加されて賞金がもらえるよ！</p>
     <p class="hint">教科 → 分野 をえらぶと、10問ずつのセッションに挑戦できるよ。<br>よく出るところを中心に作ってあるよ。まちがえた問題は「苦手ノート」にたまっていくよ。</p>
     <div id="rewardMeter" style="margin-bottom:14px"></div>
     <div class="grid" id="subjectList"></div>
@@ -276,8 +277,8 @@
   const STREAK_REWARD = 200;       // 連続ボーナスの金額（STREAK_DAYSごと・上限なし）
   // 「きのうの復習」（前日の問題をまぜて出題）で90%以上：1回目=40円、2回目=10円（3回目以降は0円・1日分につき1回）
   const REVIEW_REWARD = [40, 10];
-  // 3教科ボーナス（1日ごと）：その日に国語・理科・社会それぞれで need 個ずつ90%クリアすると yen 円（たし算。2つずつなら20+40=60円）
-  const DAILY_BONUS = [ {need:1, yen:20}, {need:2, yen:40} ];
+  // 3教科ボーナス（1日ごと）：その日に国語・理科・社会それぞれで need 個ずつ90%クリアすると yen 円（たし算。2つずつなら20+20=40円）
+  const DAILY_BONUS = [ {need:1, yen:20}, {need:2, yen:20} ];
   const DAILY_BONUS_START = "2026-10-19";   // この日から対象
   // ローカル（ダブルクリックで開いたとき）だけ教科書PDFを開ける
   const IS_FILE = (location.protocol === "file:");
@@ -874,14 +875,14 @@
       const mark = n>=top? "🥇" : (n>=1? "🥈" : "⚪");
       return `<span style="white-space:nowrap">${mark}${s} ${Math.min(n,top)}/${top}</span>`;
     }).join("　");
-    const rows = DAILY_BONUS.map(b=>{
+    const rows = DAILY_BONUS.map((b,bi)=>{
       const ok = SUBJECT_ORDER.every(s=>(cnt[s]||0)>=b.need);
-      return `<div style="${ok?"color:#2f8f2f;font-weight:800":"color:var(--sub)"}">${ok?"🏅":"⚪"} 3教科を${b.need}つずつクリア ＋${b.yen}円${ok?"　ゲット！":""}</div>`;
+      return `<div style="${ok?"color:#2f8f2f;font-weight:800":"color:var(--sub)"}">${ok?"🏅":"⚪"} 3教科を${b.need}つずつクリア ${bi?"さらに":""}＋${b.yen}円${ok?"　ゲット！":""}</div>`;
     }).join("");
     return `<div style="margin-top:10px;padding-top:9px;border-top:1px dashed #e6cfa8;font-size:13px;line-height:1.8">
       <div style="font-weight:800">🎖 きょうの3教科ボーナス</div>
       <div>${subj}</div>${rows}
-      <div style="font-size:11.5px;color:var(--sub)">90%とったセッションを数えるよ（2つずつまでいくと 1日 合計60円）</div></div>`;
+      <div style="font-size:11.5px;color:var(--sub)">90%とったセッションを数えるよ（2つずつまでいくと 1日 合計${DAILY_BONUS.reduce((t,b)=>t+b.yen,0)}円）</div></div>`;
   }
 
   function openParent(){
@@ -912,7 +913,7 @@
         ・90%クリア <b>${rw.cleared90}</b> こ × ${REWARD_PER_SESSION}円 ＝ <b>${rw.money90}円</b><br>
         ・${STREAK_DAYS}日連続ボーナス <b>${rw.blocks}</b> 回 × ${STREAK_REWARD}円 ＝ <b>${rw.moneyStreak}円</b><br>
         ・きのうの復習で90% <b>${rw.reviewCount}</b> 回（1回目${REVIEW_REWARD[0]}円・2回目${REVIEW_REWARD[1]}円）＝ <b>${rw.moneyReview}円</b><br>
-        ・3教科ボーナス <b>${rw.dailyDays}</b> 日（1つずつ${DAILY_BONUS[0].yen}円・2つずつ${DAILY_BONUS[1].yen}円）＝ <b>${rw.moneyDaily}円</b>
+        ・3教科ボーナス <b>${rw.dailyDays}</b> 日（1つずつ${DAILY_BONUS[0].yen}円・2つずつでさらに${DAILY_BONUS[1].yen}円）＝ <b>${rw.moneyDaily}円</b>
       </div>
       <div class="grid" style="margin-top:10px" id="payBtns"></div>
       <div id="payHist" style="font-size:12.5px;color:#5a6470;margin-top:8px;line-height:1.8"></div>
