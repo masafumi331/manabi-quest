@@ -204,6 +204,17 @@
     </div>
   </section>
 
+  <!-- きのうの復習（えらぶ画面） -->
+  <section id="reviewpick" class="hide">
+    <button class="back" data-go="home">← ホームへ</button>
+    <h2 class="title" id="rpTitle">🔁 きのうの復習</h2>
+    <p class="hint" id="rpHint"></p>
+    <div class="grid" id="rpList"></div>
+    <div class="grid" style="margin-top:14px">
+      <button class="btn sub block" id="rpMix">🔀 まとめて復習（正答率がどう変わったか見る）</button>
+    </div>
+  </section>
+
   <!-- WRONG BOOK -->
   <section id="wrongbook" class="hide">
     <button class="back" data-go="home">← ホームへ</button>
@@ -270,6 +281,8 @@
   const REWARD_PER_SESSION = 20;   // 1セッションで正答率90%以上（★3）になると もらえる金額
   const STREAK_DAYS = 7;           // 連続日数ボーナスの日数
   const STREAK_REWARD = 200;       // 連続ボーナスの金額（STREAK_DAYSごと・上限なし）
+  // 前日の復習：前日1回目でクリア（90%）できなかったセッションを、復習で何回目にクリアしたか
+  const REVIEW_REWARD = [20, 10];  // 1回目でクリア=20円、2回目=10円（3回目以降は0円）
   // ローカル（ダブルクリックで開いたとき）だけ教科書PDFを開ける
   const IS_FILE = (location.protocol === "file:");
 
@@ -284,6 +297,8 @@
   let progress = load(PROG_KEY, {xp:0, sessions:{}});
   if(!progress.sessions) progress.sessions = {};
   if(typeof progress.xp !== "number") progress.xp = 0;
+  if(!progress.reviewTries) progress.reviewTries = {};     // 復習の挑戦回数（キー: 元の日付|教科|分野|番号）
+  if(!progress.reviewRewards) progress.reviewRewards = {}; // 復習でもらった金額（同じキー。0円でも記録＝決着ずみ）
   let wrongs = load(WRONG_KEY, []);
   if(!Array.isArray(wrongs)) wrongs = [];
   let activity = load(ACT_KEY, []);   // 取り組み履歴（保護者用）
@@ -294,7 +309,7 @@
   function el(tag, cls, html){ const e=document.createElement(tag); if(cls)e.className=cls; if(html!=null)e.innerHTML=html; return e; }
   function esc(s){ return String(s).replace(/[&<>]/g, c=>({ "&":"&amp;","<":"&lt;",">":"&gt;" }[c])); }
   function shuffle(arr){ const a=arr.slice(); for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]];} return a; }
-  function show(id){ ["home","fields","sessions","quiz","result","wrongbook","parent"].forEach(s=>{ $("#"+s).classList.toggle("hide", s!==id); }); window.scrollTo(0,0); }
+  function show(id){ ["home","fields","sessions","quiz","result","wrongbook","parent","reviewpick"].forEach(s=>{ $("#"+s).classList.toggle("hide", s!==id); }); window.scrollTo(0,0); }
   function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("show"),1800); }
 
   function getField(subject, fieldKey){
@@ -318,6 +333,8 @@
     return slice;
   }
   function progKey(subject, fieldKey, idx){ return subject+"|"+fieldKey+"|"+idx; }
+  // ふつうのセッション（★・90%ごほうびの対象）か。復習・ミックス・苦手は対象外
+  function isRealSession(q){ return (!q.mode || q.mode==="session") && q.sessionIdx!=null; }
   function wrongKey(w){ return w.subject+"|"+w.field+"|"+w.q; }
 
   function updateHud(){
@@ -516,7 +533,19 @@
     if(rate>=0.9) stars=3; else if(rate>=0.7) stars=2; else if(rate>=0.5) stars=1;
     // save progress for real sessions
     quiz.newlyCleared = false;
-    if(quiz.mode!=="mix" && quiz.mode!=="wrong" && quiz.mode!=="review" && quiz.sessionIdx!=null){
+    // 前日の復習（セッション単位）：何回目でクリアしたかでごほうび
+    quiz.reviewGain = null;
+    if(quiz.mode==="sreview"){
+      const rk = quiz.reviewKey;
+      const tries = (progress.reviewTries[rk]||0) + 1;
+      progress.reviewTries[rk] = tries;
+      quiz.reviewTry = tries;
+      if(stars===3 && !(rk in progress.reviewRewards)){
+        quiz.reviewGain = REVIEW_REWARD[tries-1] || 0;
+        progress.reviewRewards[rk] = quiz.reviewGain;
+      }
+    }
+    if(isRealSession(quiz)){
       const key = progKey(quiz.subject, quiz.fieldKey, quiz.sessionIdx);
       const prev = progress.sessions[key];
       const best = prev? Math.max(prev.best, score) : score;
@@ -531,7 +560,8 @@
     const sec = Math.max(0, Math.round((Date.now() - (quiz.startedAt || Date.now())) / 1000));
     activity.push({ t:new Date().toISOString(), subject:quiz.subject, field:quiz.name,
       fieldKey:(quiz.fieldKey||null), sessionIdx:(quiz.sessionIdx!=null?quiz.sessionIdx:null),
-      score, total, mode:(quiz.mode||"session"), sec });
+      score, total, mode:(quiz.mode||"session"), sec,
+      reviewOf:(quiz.mode==="sreview"? quiz.reviewOf : undefined) });
     if(activity.length > 800) activity = activity.slice(-800);
     save(ACT_KEY, activity);
     updateHud();
@@ -546,8 +576,24 @@
     $("#rsPts").textContent = `+${quiz.pts}pt かくとく！（さいだい🔥${quiz.maxCombo}れんぞく）`;
     // ごほうび表示（本セッションのみ）
     const rr=$("#rsReward");
-    const isRealSession = (quiz.mode!=="mix" && quiz.mode!=="wrong" && quiz.mode!=="review" && quiz.sessionIdx!=null);
-    if(isRealSession){
+    if(quiz.mode==="sreview"){
+      const got = progress.reviewRewards[quiz.reviewKey];
+      const nextAmt = REVIEW_REWARD[quiz.reviewTry] || 0;   // つぎ（reviewTry+1回目）にクリアしたときの金額
+      const need=Math.max(1, Math.ceil(0.9*total)-score);
+      if(quiz.reviewGain!=null){
+        rr.style.color="#2f8f2f";
+        rr.innerHTML = quiz.reviewGain>0
+          ? `🪙 復習${quiz.reviewTry}回目でクリア！ ＋${quiz.reviewGain}円 ゲット！🎉`
+          : `🎉 復習でクリアできたね！（ごほうびは2回目まで）`;
+      } else if(got!=null){
+        rr.style.color="#2f8f2f"; rr.innerHTML=`🪙 この復習のごほうび（${got}円）は もうきまっているよ`;
+      } else if(nextAmt>0){
+        rr.style.color="#c26a00"; rr.innerHTML=`🪙 あと <b>${need}問</b>！ つぎにクリアすると <b>${nextAmt}円</b>`;
+      } else {
+        rr.style.color="#c26a00"; rr.innerHTML=`💪 あと <b>${need}問</b>！ クリアめざしてがんばろう`;
+      }
+      rr.style.display="";
+    } else if(isRealSession(quiz)){
       const key=progKey(quiz.subject,quiz.fieldKey,quiz.sessionIdx);
       const alreadyCleared = progress.sessions[key] && progress.sessions[key].stars===3;
       const need=Math.max(1, Math.ceil(0.9*total)-score);
@@ -603,6 +649,7 @@
   }
   $("#againBtn").onclick = ()=>{ startQuiz(quiz); };
   $("#toSessBtn").onclick = ()=>{
+    if(quiz.mode==="sreview"){ openReviewPick(); return; }
     if(quiz.mode==="mix"||quiz.mode==="wrong"||quiz.mode==="review"){ show("home"); renderHome(); }
     else openSessions(quiz.subject, quiz.fieldKey);
   };
@@ -713,7 +760,58 @@
       name:`${+mm}/${+dd} の復習`, book:null, items,
       reviewPrevRate:prevRate, reviewDate:`${+mm}/${+dd}` });
   }
-  $("#btnReview").onclick = startReviewQuiz;
+  // 前日のセッションごとに「1回目でクリア（90%）できたか」を調べる
+  function reviewSessions(tgt){
+    const map={}; const order=[];
+    tgt.recs.slice().sort((a,b)=>a.t<b.t?-1:1).forEach(a=>{
+      const k=progKey(a.subject,a.fieldKey,a.sessionIdx);
+      if(!map[k]){ map[k]={subject:a.subject, fieldKey:a.fieldKey, sessionIdx:a.sessionIdx, first:a, tries:0}; order.push(k); }
+      map[k].tries++;
+    });
+    return order.map(k=>{
+      const s=map[k]; const f=s.first;
+      s.firstClear = f.total>0 && f.score/f.total>=0.9;
+      s.rewardKey = tgt.date+"|"+k;
+      return s;
+    });
+  }
+  function openReviewPick(){
+    const tgt = reviewTarget();
+    if(!tgt){ toast("きのう以前にやったセッションがまだないよ"); return; }
+    const [, mm, dd] = tgt.date.split("-"); const md=`${+mm}/${+dd}`;
+    const list = reviewSessions(tgt);
+    $("#rpTitle").textContent = `🔁 ${md} の復習`;
+    $("#rpHint").innerHTML = `${md} に1回目でクリア（90%）できなかったセッションを、復習で<b>1回目にクリアすると${REVIEW_REWARD[0]}円</b>、<b>2回目なら${REVIEW_REWARD[1]}円</b>もらえるよ。`;
+    const box=$("#rpList"); box.innerHTML="";
+    list.forEach(s=>{
+      const f=getField(s.subject, s.fieldKey); if(!f) return;
+      const meta=SUBJECT_META[s.subject]||{color:"#888"};
+      const tries=progress.reviewTries[s.rewardKey]||0;
+      const got=progress.reviewRewards[s.rewardKey];
+      let status;
+      if(s.firstClear) status=`<span style="color:var(--sub)">${md}に1回目でクリアずみ ✨</span>`;
+      else if(got!=null) status=`<span style="color:#2f8f2f;font-weight:800">✓ クリア！ ${got}円</span>`;
+      else if(tries < REVIEW_REWARD.length) status=`<span style="color:#c26a00;font-weight:800">🪙 ${tries+1}回目でクリアすると ${REVIEW_REWARD[tries]}円</span>`;
+      else status=`<span style="color:#c26a00;font-weight:800">💪 ${tries}回ちょうせん中</span>`;
+      const fr=s.first;
+      const card=el("div","card");
+      card.innerHTML=`<div class="sess">
+        <div class="no" style="background:${meta.color}">${s.sessionIdx+1}</div>
+        <div><div style="font-weight:800">${esc(s.subject)}・${esc(f.name)} セッション${s.sessionIdx+1}</div>
+        <div class="meta">${md}の1回目 ${fr.score}/${fr.total}（${md}に${s.tries}回）</div>
+        <div class="meta">${status}</div></div>
+      </div>`;
+      card.onclick=()=>{
+        startQuiz({ mode:"sreview", subject:s.subject, fieldKey:s.fieldKey, sessionIdx:s.sessionIdx,
+          items:sessionItems(f, s.sessionIdx), name:`${f.name} ${s.sessionIdx+1}（${md}の復習）`, book:f.book,
+          reviewKey:s.rewardKey, reviewOf:tgt.date });
+      };
+      box.appendChild(card);
+    });
+    show("reviewpick");
+  }
+  $("#btnReview").onclick = openReviewPick;
+  $("#rpMix").onclick = startReviewQuiz;
 
   function exportWrongs(){
     const payload = { exportedAt:new Date().toISOString(), target:"きそがため", count:wrongs.length, items:wrongs };
@@ -760,7 +858,10 @@
     const money90 = cleared90 * REWARD_PER_SESSION;
     const blocks = streakBlocks();
     const moneyStreak = blocks * STREAK_REWARD;
-    return { cleared90, money90, blocks, moneyStreak, total: money90+moneyStreak };
+    const rv = Object.values(progress.reviewRewards||{});
+    const reviewCount = rv.filter(v=>v>0).length;
+    const moneyReview = rv.reduce((s,v)=>s+(v||0),0);
+    return { cleared90, money90, blocks, moneyStreak, reviewCount, moneyReview, total: money90+moneyStreak+moneyReview };
   }
   function renderRewardMeter(){
     const m=$("#rewardMeter"); if(!m) return;
@@ -775,7 +876,7 @@
         <div style="font-size:30px">🪙</div>
         <div>
           <div style="font-weight:800;font-size:17px">ためたごほうび <span style="color:var(--accent)">${r.total}円</span></div>
-          <div style="font-size:12.5px;color:var(--sub)">90%クリア ${r.cleared90}／${totalSess}こ（×${REWARD_PER_SESSION}円）</div>
+          <div style="font-size:12.5px;color:var(--sub)">90%クリア ${r.cleared90}／${totalSess}こ（×${REWARD_PER_SESSION}円）${r.moneyReview? `・復習 ${r.moneyReview}円`:""}</div>
         </div>
       </div>
       <div style="margin-top:9px;font-size:13px;font-weight:700;color:#c26a00">${streakMsg}</div>
@@ -807,7 +908,8 @@
       <div style="font-weight:800;font-size:18px">🪙 ごほうび合計：<span style="color:var(--accent)">${rw.total}円</span></div>
       <div style="font-size:13px;color:#5a6470;margin-top:6px;line-height:1.9">
         ・90%クリア <b>${rw.cleared90}</b> こ × ${REWARD_PER_SESSION}円 ＝ <b>${rw.money90}円</b><br>
-        ・${STREAK_DAYS}日連続ボーナス <b>${rw.blocks}</b> 回 × ${STREAK_REWARD}円 ＝ <b>${rw.moneyStreak}円</b>
+        ・${STREAK_DAYS}日連続ボーナス <b>${rw.blocks}</b> 回 × ${STREAK_REWARD}円 ＝ <b>${rw.moneyStreak}円</b><br>
+        ・前日の復習クリア <b>${rw.reviewCount}</b> こ（1回目${REVIEW_REWARD[0]}円・2回目${REVIEW_REWARD[1]}円）＝ <b>${rw.moneyReview}円</b>
       </div></div>`;
 
     // ヒートマップ（さいきん21日）
@@ -943,6 +1045,8 @@
       row(["　90%ごほうび（円）", rw.money90]),
       row([`　${STREAK_DAYS}日連続ボーナス回数`, rw.blocks]),
       row(["　連続ボーナス（円）", rw.moneyStreak]),
+      row(["　前日の復習クリア数", rw.reviewCount]),
+      row(["　復習ごほうび（円）", rw.moneyReview]),
       row(["クリア済みセッション", Object.values(progress.sessions).filter(x=>x).length]),
       row(["全セッション数", totalSess]),
       row(["のべ取り組み回数", activity.length]),
