@@ -141,6 +141,8 @@
   .bd-key:active{transform:translateY(2px);box-shadow:none}
   .bd-key:disabled{opacity:.6;cursor:default}
   .bd-ctrl2{display:grid;grid-template-columns:1fr 1.6fr;gap:8px;margin-top:10px}
+  .bd-calc3{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:10px}
+  .bd-unit{margin-left:8px;font-size:15px;color:var(--sub);font-weight:700}
   .fig{background:#fff;border:2px solid var(--line);border-radius:14px;padding:8px 6px 4px;margin-bottom:10px}
   .hide{display:none}
 </style>
@@ -460,6 +462,7 @@
     quiz.startedAt = Date.now();
     // 毎回シャッフルし直して10問すべてを出題
     quiz.deck = quiz.items.map(it=>{
+      if(it.num){ return { it, choices:[], answerIdx:-1, num:true }; }       // 数値入力型（答えをキーパッドで打つ）
       if(it.build){ return { it, choices:[], answerIdx:-1, build:true }; }   // 式ビルダー型（算数の公式）
       const choices = shuffle(it.choices);
       return { it, choices, answerIdx: choices.indexOf(it.answer) };
@@ -477,7 +480,10 @@
     $("#progBar").style.width = Math.round(quiz.i/quiz.deck.length*100)+"%";
     $("#comboBox").textContent = quiz.combo>=2? ("🔥"+quiz.combo+"れんぞく") : "";
     const box = $("#choices"); box.innerHTML="";
-    if(d.build){
+    if(d.num){
+      if(it.fig) box.appendChild(figEl(it.fig));   // 角度の図など
+      renderNumPad(box, it);    // 答えをキーパッドで打つ
+    } else if(d.build){
       if(it.fig) box.appendChild(figEl(it.fig));   // 図（数字入り）があれば先に描く
       renderBuilder(box, it);   // 算数の公式：電卓のようにボタンで式をつくる
     } else {
@@ -509,7 +515,10 @@
     return { m:mult.join("|"), d:div.join("|") };
   }
   function exprEqual(a,b){ const pa=parseExpr(a), pb=parseExpr(b); return !!(pa && pb && pa.m===pb.m && pa.d===pb.d); }
-  function ansStr(it){ return Array.isArray(it.answer)? it.answer.join("") : String(it.answer); }
+  function ansStr(it){
+    if(it.num) return String(it.answer) + (it.unit||"");
+    return Array.isArray(it.answer)? it.answer.join("") : String(it.answer);
+  }
   // ---- 図（数字入り）を描く：三角形・長方形・正方形・平行四辺形・台形・ひし形・円・直方体・立方体・円柱 ----
   function drawFig(f){
     const d=(f&&f.d)||{};
@@ -531,10 +540,44 @@
       case "box": return S+`<polygon points="30,50 130,50 130,112 30,112" style="${st}"/><polygon points="30,50 65,22 165,22 130,50" style="${st}"/><polygon points="130,50 165,22 165,84 130,112" style="${st}"/>`+tx(80,127,"横 "+d.w)+tx(170,72,"高さ "+d.hh,"start")+tx(150,15,"たて "+d.dp,"start")+E;
       case "cube": return S+`<polygon points="45,50 135,50 135,112 45,112" style="${st}"/><polygon points="45,50 80,22 170,22 135,50" style="${st}"/><polygon points="135,50 170,22 170,84 135,112" style="${st}"/>`+tx(90,127,"1辺 "+d.a)+E;
       case "cyl": return S+`<path d="M45,30 L45,100 A55,14 0 0 0 155,100 L155,30" style="${st}"/><ellipse cx="100" cy="30" rx="55" ry="14" style="${st}"/><line x1="100" y1="30" x2="155" y2="30" style="${ds}"/><circle cx="100" cy="30" r="3" fill="#333a45"/>`+tx(128,58,"半径 "+d.r)+tx(165,78,"高さ "+d.h,"start")+E;
+      // ---- 角度の図（「？」の角度を答える） ----
+      case "ang_tri": return S+`<polygon points="30,110 210,110 120,25" style="${st}"/>`+tx(50,102,d.a,"start")+tx(190,102,d.b,"end")+tx(120,48,"？")+E;
+      case "ang_rtri": return S+`<polygon points="40,110 200,110 40,30" style="${st}"/><polyline points="40,96 54,96 54,110" fill="none" stroke="#333a45" stroke-width="2"/>`+tx(185,102,d.a,"end")+tx(56,50,"？","start")+E;
+      case "ang_iso": return S+`<polygon points="40,110 200,110 120,20" style="${st}"/>`+tx(120,45,d.top)+tx(58,102,"？","start")+tx(182,102,"？","end")+E;
+      case "ang_vert": return S+`<line x1="20" y1="30" x2="220" y2="100" stroke="#333a45" stroke-width="2"/><line x1="20" y1="100" x2="220" y2="30" stroke="#333a45" stroke-width="2"/>`+tx(60,70,d.a,"end")+tx(180,70,"？","start")+E;
+      case "ang_line": return S+`<line x1="20" y1="100" x2="220" y2="100" stroke="#333a45" stroke-width="2"/><line x1="120" y1="100" x2="175" y2="30" stroke="#333a45" stroke-width="2"/>`+tx(156,92,d.a,"start")+tx(104,90,"？","end")+E;
+      case "ang_para": return S+`<line x1="20" y1="40" x2="220" y2="40" stroke="#333a45" stroke-width="2"/><line x1="20" y1="95" x2="220" y2="95" stroke="#333a45" stroke-width="2"/><line x1="70" y1="122" x2="170" y2="13" stroke="#333a45" stroke-width="2"/>`+tx(166,32,d.a,"start")+tx(84,112,"？","end")+E;
+      case "ang_quad": return S+`<polygon points="40,110 200,110 180,30 60,25" style="${st}"/>`+tx(58,102,d.a,"start")+tx(184,102,d.b,"end")+tx(168,45,d.c,"end")+tx(72,45,"？","start")+E;
     }
     return "";
   }
   function figEl(f){ const dv=el("div","fig"); dv.innerHTML=drawFig(f); return dv; }
+
+  // 答えをキーパッドで打つ（暗算・単位換算・角度）。数字キー0〜9と「.」だけ。単位は表示のみ
+  function renderNumPad(box, it){
+    let cur="";
+    const disp=el("div","bd-display"); disp.id="bdDisplay";
+    const unit = it.unit? `<span class="bd-unit">${esc(it.unit)}</span>` : "";
+    function paint(){
+      disp.innerHTML = (cur!==""? `<span class="cur">${esc(cur)}</span>` : `<span class="ph">答えの数字を打とう</span>`) + unit;
+    }
+    box.appendChild(disp);
+    const calc=el("div","bd-calc3");
+    ["7","8","9","4","5","6","1","2","3","0",".","⌫"].forEach(k=>{
+      let b;
+      if(k==="⌫"){ b=el("button","bd-key fn","⌫"); b.onclick=()=>{ if(quiz.answered) return; cur=cur.slice(0,-1); paint(); }; }
+      else { b=el("button","bd-key",k); b.onclick=()=>{ if(quiz.answered) return; if(k==="."){ if(cur.includes(".")) return; if(cur==="") cur="0"; } cur+=k; paint(); }; }
+      calc.appendChild(b);
+    });
+    box.appendChild(calc);
+    const ctrl=el("div","bd-ctrl2");
+    const clr=el("button","btn ghost small","🧹 全部消す");
+    clr.onclick=()=>{ if(quiz.answered) return; cur=""; paint(); };
+    const ok=el("button","btn primary small","✅ これで決定");
+    ok.onclick=()=>{ if(quiz.answered) return; if(cur===""){ toast("数字を打ってから決定してね"); return; } answer(null, null, cur); };
+    ctrl.appendChild(clr); ctrl.appendChild(ok);
+    paint(); box.appendChild(ctrl);
+  }
 
   // 電卓式の入力：量ボタン（問題ごと）＋ 数字キー0〜9と「.」（いつも全部）＋ 演算子 ＋−×÷（いつも4つ全部）
   // ※数字や演算子を問題ごとに出し分けるとヒントになるので、常に同じキーパッドを出す
@@ -580,7 +623,13 @@
     quiz.answered=true;
     const d = quiz.deck[quiz.i];
     let correct, chosenText;
-    if(d.build){
+    if(d.num){
+      const typed = String(built==null? "" : built);
+      correct = /^\d+(\.\d+)?$/.test(typed) && Number(typed)===Number(d.it.answer);
+      chosenText = typed + (d.it.unit||"");
+      $("#choices").querySelectorAll("button").forEach(b=>{ b.onclick=null; b.disabled=true; });
+      const disp=$("#bdDisplay"); if(disp) disp.classList.add(correct? "ok":"ng");
+    } else if(d.build){
       correct = exprEqual(built, d.it.answer);
       chosenText = (built||[]).join("");
       $("#choices").querySelectorAll("button").forEach(b=>{ b.onclick=null; b.disabled=true; });
@@ -637,7 +686,7 @@
     const fld = it._field || quiz.name;
     const w = { subject:subj, field:fld, fieldKey:it._fieldKey||quiz.fieldKey||"", q:it.q,
       choices:it.choices, answer:it.answer, explain:it.explain, chosen:chosen, date:new Date().toISOString(),
-      build:!!it.build, tiles:it.tiles, fig:it.fig };   // 算数の式ビルダー型（図つき）も苦手ノートで再出題できるように
+      build:!!it.build, tiles:it.tiles, fig:it.fig, num:!!it.num, unit:it.unit };   // 算数（式ビルダー・数値入力・図つき）も苦手ノートで再出題できるように
     const k = wrongKey(w);
     const existing = wrongs.find(x=>wrongKey(x)===k);
     if(existing){ existing.count=(existing.count||1)+1; existing.chosen=chosen; existing.date=w.date; }
@@ -872,7 +921,7 @@
     // 多くまちがえたものを優先、最大10問
     const sorted = wrongs.slice().sort((a,b)=>(b.count||1)-(a.count||1));
     const pick = shuffle(sorted.slice(0, Math.min(20, sorted.length))).slice(0, SESSION_SIZE);
-    const items = pick.map(w=>({ q:w.q, choices:w.choices, answer:w.answer, explain:w.explain, build:w.build, tiles:w.tiles, fig:w.fig,
+    const items = pick.map(w=>({ q:w.q, choices:w.choices, answer:w.answer, explain:w.explain, build:w.build, tiles:w.tiles, fig:w.fig, num:w.num, unit:w.unit,
       _subject:w.subject, _field:w.field, _fieldKey:w.fieldKey }));
     startQuiz({ mode:"wrong", subject:"苦手", fieldKey:null, sessionIdx:null, name:"苦手復習", book:null, items });
   }
@@ -970,7 +1019,7 @@
   }
   function pickWrongRoundItems(){
     return wrongs.slice().sort((a,b)=>(b.count||1)-(a.count||1)).slice(0, WRONG_ROUND_MAX)
-      .map(w=>({ q:w.q, choices:w.choices, answer:w.answer, explain:w.explain, build:w.build, tiles:w.tiles, fig:w.fig,
+      .map(w=>({ q:w.q, choices:w.choices, answer:w.answer, explain:w.explain, build:w.build, tiles:w.tiles, fig:w.fig, num:w.num, unit:w.unit,
         _subject:w.subject, _field:w.field, _fieldKey:w.fieldKey }));
   }
   function wrongRoundCard(){
