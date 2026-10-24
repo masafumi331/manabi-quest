@@ -133,6 +133,7 @@
   .bd-tile:active{transform:translateY(2px);box-shadow:none}
   .bd-tile:disabled{opacity:.6;cursor:default}
   .bd-ctrl{display:grid;grid-template-columns:1fr 1fr 1.6fr;gap:8px;margin-top:10px}
+  .fig{background:#fff;border:2px solid var(--line);border-radius:14px;padding:8px 6px 4px;margin-bottom:10px}
   .hide{display:none}
 </style>
 </head>
@@ -469,6 +470,7 @@
     $("#comboBox").textContent = quiz.combo>=2? ("🔥"+quiz.combo+"れんぞく") : "";
     const box = $("#choices"); box.innerHTML="";
     if(d.build){
+      if(it.fig) box.appendChild(figEl(it.fig));   // 図（数字入り）があれば先に描く
       renderBuilder(box, it);   // 算数の公式：電卓のようにボタンで式をつくる
     } else {
       const labels=["A","B","C","D"];
@@ -498,6 +500,32 @@
   }
   function exprEqual(a,b){ const pa=parseExpr(a), pb=parseExpr(b); return !!(pa && pb && pa.m===pb.m && pa.d===pb.d); }
   function ansStr(it){ return Array.isArray(it.answer)? it.answer.join("") : String(it.answer); }
+  // ---- 図（数字入り）を描く：三角形・長方形・正方形・平行四辺形・台形・ひし形・円・直方体・立方体・円柱 ----
+  function drawFig(f){
+    const d=(f&&f.d)||{};
+    const S='<svg viewBox="0 0 240 132" width="100%" style="max-width:280px;display:block;margin:0 auto" xmlns="http://www.w3.org/2000/svg">';
+    const E='</svg>';
+    const st='fill:#fff7e6;stroke:#333a45;stroke-width:2;stroke-linejoin:round';
+    const ds='stroke:#e5484d;stroke-width:2;stroke-dasharray:5 4';
+    const tx=(x,y,t,a)=>`<text x="${x}" y="${y}" font-size="14" font-weight="700" text-anchor="${a||"middle"}" fill="#333a45" font-family="sans-serif">${esc(t)}</text>`;
+    switch(f.shape){
+      case "tri": return S+`<polygon points="40,105 200,105 130,25" style="${st}"/><line x1="130" y1="25" x2="130" y2="105" style="${ds}"/>`+tx(120,122,"底辺 "+d.b)+tx(138,70,"高さ "+d.h,"start")+E;
+      case "rect": return S+`<rect x="60" y="25" width="150" height="80" style="${st}"/>`+tx(135,122,"横 "+d.w)+tx(55,70,"たて "+d.h,"end")+E;
+      case "square": return S+`<rect x="75" y="18" width="90" height="90" style="${st}"/>`+tx(120,126,"1辺 "+d.a)+E;
+      case "para": return S+`<polygon points="30,105 170,105 210,25 70,25" style="${st}"/><line x1="170" y1="25" x2="170" y2="105" style="${ds}"/>`+tx(100,122,"底辺 "+d.b)+tx(178,70,"高さ "+d.h,"start")+E;
+      case "trap": return S+`<polygon points="40,105 200,105 160,25 80,25" style="${st}"/><line x1="160" y1="25" x2="160" y2="105" style="${ds}"/>`+tx(120,18,"上底 "+d.t)+tx(110,122,"下底 "+d.b)+tx(168,70,"高さ "+d.h,"start")+E;
+      case "rhombus": return S+`<polygon points="120,12 205,65 120,118 35,65" style="${st}"/><line x1="35" y1="65" x2="205" y2="65" style="${ds}"/><line x1="120" y1="12" x2="120" y2="118" style="${ds}"/>`+tx(120,128,d.d1)+tx(128,40,d.d2,"start")+E;
+      case "circle": return S+`<circle cx="120" cy="66" r="52" style="${st}"/>`+(d.r
+        ? `<line x1="120" y1="66" x2="172" y2="66" style="${ds}"/><circle cx="120" cy="66" r="3" fill="#333a45"/>`+tx(146,58,"半径 "+d.r)
+        : `<line x1="68" y1="66" x2="172" y2="66" style="${ds}"/>`+tx(120,58,"直径 "+d.dia))+E;
+      case "box": return S+`<polygon points="30,50 130,50 130,112 30,112" style="${st}"/><polygon points="30,50 65,22 165,22 130,50" style="${st}"/><polygon points="130,50 165,22 165,84 130,112" style="${st}"/>`+tx(80,127,"横 "+d.w)+tx(170,72,"高さ "+d.hh,"start")+tx(150,15,"たて "+d.dp,"start")+E;
+      case "cube": return S+`<polygon points="45,50 135,50 135,112 45,112" style="${st}"/><polygon points="45,50 80,22 170,22 135,50" style="${st}"/><polygon points="135,50 170,22 170,84 135,112" style="${st}"/>`+tx(90,127,"1辺 "+d.a)+E;
+      case "cyl": return S+`<path d="M45,30 L45,100 A55,14 0 0 0 155,100 L155,30" style="${st}"/><ellipse cx="100" cy="30" rx="55" ry="14" style="${st}"/><line x1="100" y1="30" x2="155" y2="30" style="${ds}"/><circle cx="100" cy="30" r="3" fill="#333a45"/>`+tx(128,58,"半径 "+d.r)+tx(165,78,"高さ "+d.h,"start")+E;
+    }
+    return "";
+  }
+  function figEl(f){ const dv=el("div","fig"); dv.innerHTML=drawFig(f); return dv; }
+
   function renderBuilder(box, it){
     const tokens=[];
     const disp=el("div","bd-display"); disp.id="bdDisplay";
@@ -585,7 +613,7 @@
     const fld = it._field || quiz.name;
     const w = { subject:subj, field:fld, fieldKey:it._fieldKey||quiz.fieldKey||"", q:it.q,
       choices:it.choices, answer:it.answer, explain:it.explain, chosen:chosen, date:new Date().toISOString(),
-      build:!!it.build, tiles:it.tiles };   // 算数の式ビルダー型も苦手ノートで再出題できるように
+      build:!!it.build, tiles:it.tiles, fig:it.fig };   // 算数の式ビルダー型（図つき）も苦手ノートで再出題できるように
     const k = wrongKey(w);
     const existing = wrongs.find(x=>wrongKey(x)===k);
     if(existing){ existing.count=(existing.count||1)+1; existing.chosen=chosen; existing.date=w.date; }
@@ -820,7 +848,7 @@
     // 多くまちがえたものを優先、最大10問
     const sorted = wrongs.slice().sort((a,b)=>(b.count||1)-(a.count||1));
     const pick = shuffle(sorted.slice(0, Math.min(20, sorted.length))).slice(0, SESSION_SIZE);
-    const items = pick.map(w=>({ q:w.q, choices:w.choices, answer:w.answer, explain:w.explain, build:w.build, tiles:w.tiles,
+    const items = pick.map(w=>({ q:w.q, choices:w.choices, answer:w.answer, explain:w.explain, build:w.build, tiles:w.tiles, fig:w.fig,
       _subject:w.subject, _field:w.field, _fieldKey:w.fieldKey }));
     startQuiz({ mode:"wrong", subject:"苦手", fieldKey:null, sessionIdx:null, name:"苦手復習", book:null, items });
   }
@@ -918,7 +946,7 @@
   }
   function pickWrongRoundItems(){
     return wrongs.slice().sort((a,b)=>(b.count||1)-(a.count||1)).slice(0, WRONG_ROUND_MAX)
-      .map(w=>({ q:w.q, choices:w.choices, answer:w.answer, explain:w.explain, build:w.build, tiles:w.tiles,
+      .map(w=>({ q:w.q, choices:w.choices, answer:w.answer, explain:w.explain, build:w.build, tiles:w.tiles, fig:w.fig,
         _subject:w.subject, _field:w.field, _fieldKey:w.fieldKey }));
   }
   function wrongRoundCard(){
