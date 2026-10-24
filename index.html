@@ -133,6 +133,14 @@
   .bd-tile:active{transform:translateY(2px);box-shadow:none}
   .bd-tile:disabled{opacity:.6;cursor:default}
   .bd-ctrl{display:grid;grid-template-columns:1fr 1fr 1.6fr;gap:8px;margin-top:10px}
+  .bd-display .cur{text-decoration:underline;text-decoration-color:var(--accent);text-underline-offset:4px}
+  .bd-calc{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:10px}
+  .bd-key{background:#fff;border:2px solid var(--line);border-radius:12px;padding:12px 4px;font-size:19px;font-weight:800;cursor:pointer;font-family:inherit;color:var(--ink);box-shadow:0 3px 0 rgba(0,0,0,.06)}
+  .bd-key.op{background:#fff3dd;border-color:#f0c98a;font-size:22px}
+  .bd-key.fn{background:#f3eee4;color:var(--sub)}
+  .bd-key:active{transform:translateY(2px);box-shadow:none}
+  .bd-key:disabled{opacity:.6;cursor:default}
+  .bd-ctrl2{display:grid;grid-template-columns:1fr 1.6fr;gap:8px;margin-top:10px}
   .fig{background:#fff;border:2px solid var(--line);border-radius:14px;padding:8px 6px 4px;margin-bottom:10px}
   .hide{display:none}
 </style>
@@ -487,13 +495,15 @@
   }
   // ---- 式ビルダー（算数の公式）の判定：かけ算の並び順はどれでもOK。÷で割るものが同じならOK ----
   const OPS = new Set(["×","÷","＋","−"]);
+  // 数字は「3.140」「010」のような打ち方でも同じ数として比べる
+  function normTok(t){ t=String(t); if(/^\d+(\.\d+)?$/.test(t)){ const n=Number(t); return Number.isFinite(n)? String(n) : t; } return t; }
   function parseExpr(tokens){
     if(!Array.isArray(tokens) || !tokens.length || OPS.has(tokens[0])) return null;
-    const mult=[tokens[0]], div=[];
+    const mult=[normTok(tokens[0])], div=[];
     for(let i=1;i<tokens.length;i+=2){
       const op=tokens[i], v=tokens[i+1];
       if((op!=="×" && op!=="÷") || v==null || OPS.has(v)) return null;
-      (op==="×"? mult : div).push(v);
+      (op==="×"? mult : div).push(normTok(v));
     }
     mult.sort(); div.sort();
     return { m:mult.join("|"), d:div.join("|") };
@@ -526,29 +536,43 @@
   }
   function figEl(f){ const dv=el("div","fig"); dv.innerHTML=drawFig(f); return dv; }
 
+  // 電卓式の入力：量ボタン（問題ごと）＋ 数字キー0〜9と「.」（いつも全部）＋ 演算子 ＋−×÷（いつも4つ全部）
+  // ※数字や演算子を問題ごとに出し分けるとヒントになるので、常に同じキーパッドを出す
   function renderBuilder(box, it){
-    const tokens=[];
+    const tokens=[]; let cur="";   // cur＝いま打っている途中の数字
     const disp=el("div","bd-display"); disp.id="bdDisplay";
-    const tiles=el("div","bd-tiles");
-    const ctrl=el("div","bd-ctrl");
+    function flush(){ if(cur!==""){ tokens.push(cur); cur=""; } }
     function paint(){
-      disp.innerHTML = tokens.length
-        ? tokens.map(t=>`<span>${esc(t)}</span>`).join("")
-        : `<span class="ph">ボタンをおして式をつくろう（例：底辺 × 高さ ÷ 2）</span>`;
+      const parts=tokens.map(t=>`<span>${esc(t)}</span>`);
+      if(cur!=="") parts.push(`<span class="cur">${esc(cur)}</span>`);
+      disp.innerHTML = parts.length? parts.join("") : `<span class="ph">ボタンをおして式をつくろう</span>`;
     }
-    it.tiles.forEach(t=>{
-      const b=el("button","bd-tile"+(OPS.has(t)?" op":""), esc(t));
-      b.onclick=()=>{ if(quiz.answered) return; tokens.push(t); paint(); };
-      tiles.appendChild(b);
+    box.appendChild(disp);
+    // 量ボタン（「半径」「底辺」「（上底＋下底）」など。数字・演算子はふくまない）
+    const words=(it.tiles||[]).filter(t=>!OPS.has(t) && !/^\d+(\.\d+)?$/.test(t));
+    if(words.length){
+      const wt=el("div","bd-tiles");
+      words.forEach(t=>{ const b=el("button","bd-tile",esc(t)); b.onclick=()=>{ if(quiz.answered) return; flush(); tokens.push(t); paint(); }; wt.appendChild(b); });
+      box.appendChild(wt);
+    }
+    // 電卓キー：数字と演算子を電卓のならびで
+    const calc=el("div","bd-calc");
+    const keys=["7","8","9","÷","4","5","6","×","1","2","3","−","0",".","⌫","＋"];
+    keys.forEach(k=>{
+      let b;
+      if(k==="⌫"){ b=el("button","bd-key fn","⌫"); b.onclick=()=>{ if(quiz.answered) return; if(cur!=="") cur=cur.slice(0,-1); else tokens.pop(); paint(); }; }
+      else if(OPS.has(k)){ b=el("button","bd-key op",k); b.onclick=()=>{ if(quiz.answered) return; flush(); tokens.push(k); paint(); }; }
+      else { b=el("button","bd-key",k); b.onclick=()=>{ if(quiz.answered) return; if(k==="."){ if(cur.includes(".")) return; if(cur==="") cur="0"; } cur+=k; paint(); }; }
+      calc.appendChild(b);
     });
-    const back=el("button","btn sub small","⌫ ひとつ消す");
-    back.onclick=()=>{ if(quiz.answered) return; tokens.pop(); paint(); };
+    box.appendChild(calc);
+    const ctrl=el("div","bd-ctrl2");
     const clr=el("button","btn ghost small","🧹 全部消す");
-    clr.onclick=()=>{ if(quiz.answered) return; tokens.length=0; paint(); };
+    clr.onclick=()=>{ if(quiz.answered) return; tokens.length=0; cur=""; paint(); };
     const ok=el("button","btn primary small","✅ これで決定");
-    ok.onclick=()=>{ if(quiz.answered) return; if(!tokens.length){ toast("式をつくってから決定してね"); return; } answer(null, null, tokens.slice()); };
-    ctrl.appendChild(back); ctrl.appendChild(clr); ctrl.appendChild(ok);
-    paint(); box.appendChild(disp); box.appendChild(tiles); box.appendChild(ctrl);
+    ok.onclick=()=>{ if(quiz.answered) return; flush(); if(!tokens.length){ toast("式をつくってから決定してね"); return; } answer(null, null, tokens.slice()); };
+    ctrl.appendChild(clr); ctrl.appendChild(ok);
+    paint(); box.appendChild(ctrl);
   }
 
   function answer(idx, btnEl, built){
