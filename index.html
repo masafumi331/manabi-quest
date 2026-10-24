@@ -122,6 +122,17 @@
   .subjstat{background:#fff;border:2px solid var(--line);border-radius:14px;padding:12px 14px}
   .subjstat .bar{height:9px;background:#eee4d4;border-radius:999px;overflow:hidden;margin-top:7px}
   .subjstat .bar > i{display:block;height:100%;border-radius:999px}
+  /* 式ビルダー（算数の公式） */
+  .bd-display{min-height:54px;background:#fff;border:2px solid var(--line);border-radius:14px;padding:10px 12px;font-size:20px;font-weight:800;letter-spacing:.04em;display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin-bottom:10px}
+  .bd-display.ok{border-color:var(--ok);background:#eafbe7}
+  .bd-display.ng{border-color:var(--ng);background:#fdecec}
+  .bd-display .ph{color:var(--sub);font-weight:600;font-size:13.5px}
+  .bd-tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .bd-tile{background:#fff;border:2px solid var(--line);border-radius:12px;padding:13px 6px;font-size:16px;font-weight:800;cursor:pointer;font-family:inherit;color:var(--ink);box-shadow:0 3px 0 rgba(0,0,0,.06)}
+  .bd-tile.op{background:#fff3dd;border-color:#f0c98a;font-size:21px}
+  .bd-tile:active{transform:translateY(2px);box-shadow:none}
+  .bd-tile:disabled{opacity:.6;cursor:default}
+  .bd-ctrl{display:grid;grid-template-columns:1fr 1fr 1.6fr;gap:8px;margin-top:10px}
   .hide{display:none}
 </style>
 </head>
@@ -257,12 +268,16 @@
 <script src="data/kokugo.js"></script>
 <script src="data/rika.js"></script>
 <script src="data/shakai.js"></script>
+<script src="data/sansu.js"></script>
 <script>
 "use strict";
 (function(){
-  const SUBJECT_ORDER = ["国語","理科","社会"];
+  const SUBJECT_ORDER = ["国語","算数","理科","社会"];
+  // 「3教科ボーナス」の3教科は国語・理科・社会。算数は4教科目として FOUR_SUBJECT_BONUS 円が上乗せ
+  const BONUS_CORE = ["国語","理科","社会"];
   const SUBJECT_META = {
     "国語":{color:"var(--kokugo)", icon:"✏️", desc:"漢字・ことわざ・慣用句"},
+    "算数":{color:"#f59e0b", icon:"➗", desc:"公式を電卓のように式でつくる"},
     "理科":{color:"var(--rika)", icon:"🔬", desc:"気象・力・生き物・地学"},
     "社会":{color:"var(--shakai)", icon:"🗾", desc:"歴史・地理・公民"},
   };
@@ -280,6 +295,7 @@
   // 3教科ボーナス（1日ごと）：その日に国語・理科・社会それぞれで need 個ずつ90%クリアすると yen 円（たし算。2つずつなら20+20=40円）
   const DAILY_BONUS = [ {need:1, yen:20}, {need:2, yen:20} ];
   const DAILY_BONUS_START = "2026-10-19";   // この日から対象
+  const FOUR_SUBJECT_BONUS = 10;            // 算数も入れて4教科それぞれ1つ以上90%クリアした日は さらに +10円
   // 3日に1回の苦手チャレンジ：苦手ノートから最大20問。1度目で8割=40円、2度目で9割=20円（3度目以降は0円）
   const WRONG_ROUND_EVERY = 3;   // 何日ごとに出すか
   const WRONG_ROUND_MAX = 20;    // 最大の問題数
@@ -435,6 +451,7 @@
     quiz.startedAt = Date.now();
     // 毎回シャッフルし直して10問すべてを出題
     quiz.deck = quiz.items.map(it=>{
+      if(it.build){ return { it, choices:[], answerIdx:-1, build:true }; }   // 式ビルダー型（算数の公式）
       const choices = shuffle(it.choices);
       return { it, choices, answerIdx: choices.indexOf(it.answer) };
     });
@@ -451,30 +468,83 @@
     $("#progBar").style.width = Math.round(quiz.i/quiz.deck.length*100)+"%";
     $("#comboBox").textContent = quiz.combo>=2? ("🔥"+quiz.combo+"れんぞく") : "";
     const box = $("#choices"); box.innerHTML="";
-    const labels=["A","B","C","D"];
-    d.choices.forEach((c,idx)=>{
-      const b = el("button","choice");
-      b.innerHTML = `<span class="lab">${labels[idx]}</span><span>${esc(c)}</span>`;
-      b.onclick = ()=>answer(idx, b);
-      box.appendChild(b);
-    });
+    if(d.build){
+      renderBuilder(box, it);   // 算数の公式：電卓のようにボタンで式をつくる
+    } else {
+      const labels=["A","B","C","D"];
+      d.choices.forEach((c,idx)=>{
+        const b = el("button","choice");
+        b.innerHTML = `<span class="lab">${labels[idx]}</span><span>${esc(c)}</span>`;
+        b.onclick = ()=>answer(idx, b);
+        box.appendChild(b);
+      });
+    }
     $("#feedback").className="feedback";
     $("#qfoot").classList.add("hide");
     quiz.answered=false;
   }
-  function answer(idx, btnEl){
+  // ---- 式ビルダー（算数の公式）の判定：かけ算の並び順はどれでもOK。÷で割るものが同じならOK ----
+  const OPS = new Set(["×","÷","＋","−"]);
+  function parseExpr(tokens){
+    if(!Array.isArray(tokens) || !tokens.length || OPS.has(tokens[0])) return null;
+    const mult=[tokens[0]], div=[];
+    for(let i=1;i<tokens.length;i+=2){
+      const op=tokens[i], v=tokens[i+1];
+      if((op!=="×" && op!=="÷") || v==null || OPS.has(v)) return null;
+      (op==="×"? mult : div).push(v);
+    }
+    mult.sort(); div.sort();
+    return { m:mult.join("|"), d:div.join("|") };
+  }
+  function exprEqual(a,b){ const pa=parseExpr(a), pb=parseExpr(b); return !!(pa && pb && pa.m===pb.m && pa.d===pb.d); }
+  function ansStr(it){ return Array.isArray(it.answer)? it.answer.join("") : String(it.answer); }
+  function renderBuilder(box, it){
+    const tokens=[];
+    const disp=el("div","bd-display"); disp.id="bdDisplay";
+    const tiles=el("div","bd-tiles");
+    const ctrl=el("div","bd-ctrl");
+    function paint(){
+      disp.innerHTML = tokens.length
+        ? tokens.map(t=>`<span>${esc(t)}</span>`).join("")
+        : `<span class="ph">ボタンをおして式をつくろう（例：底辺 × 高さ ÷ 2）</span>`;
+    }
+    it.tiles.forEach(t=>{
+      const b=el("button","bd-tile"+(OPS.has(t)?" op":""), esc(t));
+      b.onclick=()=>{ if(quiz.answered) return; tokens.push(t); paint(); };
+      tiles.appendChild(b);
+    });
+    const back=el("button","btn sub small","⌫ ひとつ消す");
+    back.onclick=()=>{ if(quiz.answered) return; tokens.pop(); paint(); };
+    const clr=el("button","btn ghost small","🧹 全部消す");
+    clr.onclick=()=>{ if(quiz.answered) return; tokens.length=0; paint(); };
+    const ok=el("button","btn primary small","✅ これで決定");
+    ok.onclick=()=>{ if(quiz.answered) return; if(!tokens.length){ toast("式をつくってから決定してね"); return; } answer(null, null, tokens.slice()); };
+    ctrl.appendChild(back); ctrl.appendChild(clr); ctrl.appendChild(ok);
+    paint(); box.appendChild(disp); box.appendChild(tiles); box.appendChild(ctrl);
+  }
+
+  function answer(idx, btnEl, built){
     if(quiz.answered) return;
     quiz.answered=true;
     const d = quiz.deck[quiz.i];
-    const correct = (idx === d.answerIdx);
-    const btns = Array.from($("#choices").children);
-    btns.forEach((b,bi)=>{
-      b.onclick=null;
-      if(bi===d.answerIdx) b.classList.add("ok");
-      else if(bi===idx) b.classList.add("ng");
-      else b.classList.add("dim");
-    });
-    quiz.answers.push({ it:d.it, chosen:d.choices[idx], correct });
+    let correct, chosenText;
+    if(d.build){
+      correct = exprEqual(built, d.it.answer);
+      chosenText = (built||[]).join("");
+      $("#choices").querySelectorAll("button").forEach(b=>{ b.onclick=null; b.disabled=true; });
+      const disp=$("#bdDisplay"); if(disp) disp.classList.add(correct? "ok":"ng");
+    } else {
+      correct = (idx === d.answerIdx);
+      chosenText = d.choices[idx];
+      const btns = Array.from($("#choices").children);
+      btns.forEach((b,bi)=>{
+        b.onclick=null;
+        if(bi===d.answerIdx) b.classList.add("ok");
+        else if(bi===idx) b.classList.add("ng");
+        else b.classList.add("dim");
+      });
+    }
+    quiz.answers.push({ it:d.it, chosen:chosenText, correct });
     const fb = $("#feedback"); const head=$("#fbHead"); const body=$("#fbBody");
     if(correct){
       quiz.correct++; quiz.combo++; quiz.maxCombo=Math.max(quiz.maxCombo,quiz.combo);
@@ -486,9 +556,9 @@
     }else{
       quiz.combo=0;
       fb.className="feedback bad show";
-      head.textContent = `おしい！ 正解は「${esc(d.it.answer)}」`;
+      head.textContent = `おしい！ 正解は「${esc(ansStr(d.it))}」`;
       body.innerHTML = esc(d.it.explain);
-      recordWrong(d.it, d.choices[idx]);
+      recordWrong(d.it, chosenText);
       const bk = bookFor(d.it);
       if(bk && IS_FILE){
         const btn = el("button","btn sub small","📖 教科書で見る（"+esc(bk.label)+"）");
@@ -514,7 +584,8 @@
     const subj = it._subject || quiz.subject;
     const fld = it._field || quiz.name;
     const w = { subject:subj, field:fld, fieldKey:it._fieldKey||quiz.fieldKey||"", q:it.q,
-      choices:it.choices, answer:it.answer, explain:it.explain, chosen:chosen, date:new Date().toISOString() };
+      choices:it.choices, answer:it.answer, explain:it.explain, chosen:chosen, date:new Date().toISOString(),
+      build:!!it.build, tiles:it.tiles };   // 算数の式ビルダー型も苦手ノートで再出題できるように
     const k = wrongKey(w);
     const existing = wrongs.find(x=>wrongKey(x)===k);
     if(existing){ existing.count=(existing.count||1)+1; existing.chosen=chosen; existing.date=w.date; }
@@ -658,9 +729,9 @@
       const rev = el("div", "rev"+(a.correct?"":" wrong"));
       let html = `<div class="rq">${idx+1}. ${esc(a.it.q)}</div>`;
       if(a.correct){
-        html += `<div class="ra"><span class="cor">◯ せいかい：${esc(a.it.answer)}</span></div>`;
+        html += `<div class="ra"><span class="cor">◯ せいかい：${esc(ansStr(a.it))}</span></div>`;
       }else{
-        html += `<div class="ra"><span class="you">✗ あなた：${esc(a.chosen)}</span>　<span class="cor">◯ 正解：${esc(a.it.answer)}</span></div>`;
+        html += `<div class="ra"><span class="you">✗ あなた：${esc(a.chosen)}</span>　<span class="cor">◯ 正解：${esc(ansStr(a.it))}</span></div>`;
       }
       html += `<div class="ex">💡 ${esc(a.it.explain)}</div>`;
       rev.innerHTML=html;
@@ -749,7 +820,7 @@
     // 多くまちがえたものを優先、最大10問
     const sorted = wrongs.slice().sort((a,b)=>(b.count||1)-(a.count||1));
     const pick = shuffle(sorted.slice(0, Math.min(20, sorted.length))).slice(0, SESSION_SIZE);
-    const items = pick.map(w=>({ q:w.q, choices:w.choices, answer:w.answer, explain:w.explain,
+    const items = pick.map(w=>({ q:w.q, choices:w.choices, answer:w.answer, explain:w.explain, build:w.build, tiles:w.tiles,
       _subject:w.subject, _field:w.field, _fieldKey:w.fieldKey }));
     startQuiz({ mode:"wrong", subject:"苦手", fieldKey:null, sessionIdx:null, name:"苦手復習", book:null, items });
   }
@@ -801,7 +872,7 @@
     toast("苦手リスト.json を保存したよ");
   }
   function copyWrongs(){
-    const text = wrongs.map(w=>`【${w.subject}・${w.field}】${w.q.replace(/\n/g," ")}（正解：${w.answer}／まちがえた回数：${w.count||1}）`).join("\n");
+    const text = wrongs.map(w=>`【${w.subject}・${w.field}】${w.q.replace(/\n/g," ")}（正解：${Array.isArray(w.answer)? w.answer.join("") : w.answer}／まちがえた回数：${w.count||1}）`).join("\n");
     const full = "次の問題をよくまちがえます。同じ分野・レベルの新しい4択問題を作ってください。\n\n"+text;
     try{ navigator.clipboard.writeText(full).then(()=>toast("コピーしたよ！クロードに貼りつけてね")); }
     catch(e){ toast("コピーできませんでした"); }
@@ -847,7 +918,7 @@
   }
   function pickWrongRoundItems(){
     return wrongs.slice().sort((a,b)=>(b.count||1)-(a.count||1)).slice(0, WRONG_ROUND_MAX)
-      .map(w=>({ q:w.q, choices:w.choices, answer:w.answer, explain:w.explain,
+      .map(w=>({ q:w.q, choices:w.choices, answer:w.answer, explain:w.explain, build:w.build, tiles:w.tiles,
         _subject:w.subject, _field:w.field, _fieldKey:w.fieldKey }));
   }
   function wrongRoundCard(){
@@ -890,8 +961,12 @@
     return cnt;
   }
   function dayBonusAmount(cnt){
-    const m=Math.min(...SUBJECT_ORDER.map(s=>cnt[s]||0)); let yen=0;
+    // 基本は国語・理科・社会の3教科（これまで通り）
+    const m=Math.min(...BONUS_CORE.map(s=>cnt[s]||0)); let yen=0;
     DAILY_BONUS.forEach(b=>{ if(m>=b.need) yen+=b.yen; });
+    // 算数も入れて4教科それぞれ1つ以上クリアした日は さらに +FOUR_SUBJECT_BONUS 円
+    const m4=Math.min(...SUBJECT_ORDER.map(s=>cnt[s]||0));
+    if(m>=1 && m4>=1) yen+=FOUR_SUBJECT_BONUS;
     return yen;
   }
   // 履歴から3教科ボーナスを確定させる（増えるだけ・減らさない）。ふえた金額を返す
@@ -953,13 +1028,16 @@
       return `<span style="white-space:nowrap">${mark}${s} ${Math.min(n,top)}/${top}</span>`;
     }).join("　");
     const rows = DAILY_BONUS.map((b,bi)=>{
-      const ok = SUBJECT_ORDER.every(s=>(cnt[s]||0)>=b.need);
-      return `<div style="${ok?"color:#2f8f2f;font-weight:800":"color:var(--sub)"}">${ok?"🏅":"⚪"} 3教科を${b.need}つずつクリア ${bi?"さらに":""}＋${b.yen}円${ok?"　ゲット！":""}</div>`;
+      const ok = BONUS_CORE.every(s=>(cnt[s]||0)>=b.need);
+      return `<div style="${ok?"color:#2f8f2f;font-weight:800":"color:var(--sub)"}">${ok?"🏅":"⚪"} 国・理・社を${b.need}つずつクリア ${bi?"さらに":""}＋${b.yen}円${ok?"　ゲット！":""}</div>`;
     }).join("");
+    const ok3 = BONUS_CORE.every(s=>(cnt[s]||0)>=1);
+    const ok4 = ok3 && SUBJECT_ORDER.every(s=>(cnt[s]||0)>=1);
+    const row4 = `<div style="${ok4?"color:#2f8f2f;font-weight:800":"color:var(--sub)"}">${ok4?"🏅":"⚪"} 算数も入れて4教科クリア さらに＋${FOUR_SUBJECT_BONUS}円${ok4?"　ゲット！":""}</div>`;
     return `<div style="margin-top:10px;padding-top:9px;border-top:1px dashed #e6cfa8;font-size:13px;line-height:1.8">
-      <div style="font-weight:800">🎖 きょうの3教科ボーナス</div>
-      <div>${subj}</div>${rows}
-      <div style="font-size:11.5px;color:var(--sub)">90%とったセッションを数えるよ（2つずつまでいくと 1日 合計${DAILY_BONUS.reduce((t,b)=>t+b.yen,0)}円）</div></div>`;
+      <div style="font-weight:800">🎖 きょうの教科ボーナス</div>
+      <div>${subj}</div>${rows}${row4}
+      <div style="font-size:11.5px;color:var(--sub)">90%とったセッションを数えるよ（国理社2つずつ＋算数で 1日 最大${DAILY_BONUS.reduce((t,b)=>t+b.yen,0)+FOUR_SUBJECT_BONUS}円）</div></div>`;
   }
 
   function openParent(){
