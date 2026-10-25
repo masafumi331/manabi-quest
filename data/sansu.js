@@ -329,6 +329,384 @@ window.QUIZ_DATA["算数"] = {
           "answer": "1000",
           "explain": "60000÷60＝分速1000m。",
           "unit": "m"
+        },
+        {
+          "num": true,
+          "q": "2km300m は何m？",
+          "answer": "2300",
+          "explain": "2km＝2000m。2000＋300＝2300m。",
+          "unit": "m"
+        },
+        {
+          "num": true,
+          "q": "4.2km は何m？",
+          "answer": "4200",
+          "explain": "1000×4.2＝4200m。",
+          "unit": "m"
+        },
+        {
+          "num": true,
+          "q": "750m は何km？",
+          "answer": "0.75",
+          "explain": "750÷1000＝0.75km。",
+          "unit": "km"
+        },
+        {
+          "num": true,
+          "q": "1m は何mm？",
+          "answer": "1000",
+          "explain": "1m＝100cm＝1000mm。",
+          "unit": "mm"
+        },
+        {
+          "num": true,
+          "q": "3m50cm は何cm？",
+          "answer": "350",
+          "explain": "3m＝300cm。300＋50＝350cm。",
+          "unit": "cm"
+        },
+        {
+          "num": true,
+          "q": "0.8m は何cm？",
+          "answer": "80",
+          "explain": "100×0.8＝80cm。",
+          "unit": "cm"
+        },
+        {
+          "num": true,
+          "q": "65cm は何m？",
+          "answer": "0.65",
+          "explain": "65÷100＝0.65m。",
+          "unit": "m"
+        },
+        {
+          "num": true,
+          "q": "2.3cm は何mm？",
+          "answer": "23",
+          "explain": "10×2.3＝23mm。",
+          "unit": "mm"
+        },
+        {
+          "num": true,
+          "q": "1km は何cm？",
+          "answer": "100000",
+          "explain": "1km＝1000m、1m＝100cm。1000×100＝100000cm。",
+          "unit": "cm"
+        },
+        {
+          "num": true,
+          "q": "1km−350m は何m？",
+          "answer": "650",
+          "explain": "1km＝1000m。1000−350＝650m。",
+          "unit": "m"
+        },
+        {
+          "num": true,
+          "q": "1.2m＋30cm は何cm？",
+          "answer": "150",
+          "explain": "1.2m＝120cm。120＋30＝150cm。",
+          "unit": "cm"
+        },
+        {
+          "num": true,
+          "q": "8mm は何cm？",
+          "answer": "0.8",
+          "explain": "8÷10＝0.8cm。",
+          "unit": "cm"
+        },
+        {
+          "num": true,
+          "q": "2L300mL は何mL？",
+          "answer": "2300",
+          "explain": "2L＝2000mL。2000＋300＝2300mL。",
+          "unit": "mL"
+        },
+        {
+          "num": true,
+          "q": "0.7L は何mL？",
+          "answer": "700",
+          "explain": "1000×0.7＝700mL。",
+          "unit": "mL"
+        },
+        {
+          "num": true,
+          "q": "3dL は何mL？",
+          "answer": "300",
+          "explain": "1dL＝100mL なので 3dL＝300mL。",
+          "unit": "mL"
+        },
+        {
+          "num": true,
+          "q": "1.8L は何dL？",
+          "answer": "18",
+          "explain": "1L＝10dL。10×1.8＝18dL。",
+          "unit": "dL"
+        },
+        {
+          "num": true,
+          "q": "450mL は何dL？",
+          "answer": "4.5",
+          "explain": "1dL＝100mL。450÷100＝4.5dL。",
+          "unit": "dL"
+        },
+        {
+          "num": true,
+          "q": "2L−600mL は何mL？",
+          "answer": "1400",
+          "explain": "2L＝2000mL。2000−600＝1400mL。",
+          "unit": "mL"
+        },
+        {
+          "num": true,
+          "q": "500cm³ は何L？",
+          "answer": "0.5",
+          "explain": "1L＝1000cm³。500÷1000＝0.5L。",
+          "unit": "L"
+        },
+        {
+          "num": true,
+          "q": "3L は何cm³？",
+          "answer": "3000",
+          "explain": "1L＝1000cm³ なので 3L＝3000cm³。",
+          "unit": "cm³"
+        },
+        {
+          "num": true,
+          "q": "0.2m³ は何L？",
+          "answer": "200",
+          "explain": "1m³＝1000L。1000×0.2＝200L。",
+          "unit": "L"
+        },
+        {
+          "num": true,
+          "q": "1辺10cmの立方体に入る水は何L？",
+          "answer": "1",
+          "explain": "10×10×10＝1000cm³＝1L。",
+          "unit": "L"
+        },
+        {
+          "num": true,
+          "q": "2500cm³ は何L？",
+          "answer": "2.5",
+          "explain": "2500÷1000＝2.5L。",
+          "unit": "L"
+        },
+        {
+          "num": true,
+          "q": "1L は何m³？（小数で）",
+          "answer": "0.001",
+          "explain": "1m³＝1000L なので 1L＝1÷1000＝0.001m³。",
+          "unit": "m³"
+        },
+        {
+          "num": true,
+          "q": "1kg300g は何g？",
+          "answer": "1300",
+          "explain": "1kg＝1000g。1000＋300＝1300g。",
+          "unit": "g"
+        },
+        {
+          "num": true,
+          "q": "0.6kg は何g？",
+          "answer": "600",
+          "explain": "1000×0.6＝600g。",
+          "unit": "g"
+        },
+        {
+          "num": true,
+          "q": "3500g は何kg？",
+          "answer": "3.5",
+          "explain": "3500÷1000＝3.5kg。",
+          "unit": "kg"
+        },
+        {
+          "num": true,
+          "q": "2t は何kg？",
+          "answer": "2000",
+          "explain": "1t＝1000kg なので 2t＝2000kg。",
+          "unit": "kg"
+        },
+        {
+          "num": true,
+          "q": "750kg は何t？",
+          "answer": "0.75",
+          "explain": "750÷1000＝0.75t。",
+          "unit": "t"
+        },
+        {
+          "num": true,
+          "q": "1kg は何mg？",
+          "answer": "1000000",
+          "explain": "1kg＝1000g、1g＝1000mg。1000×1000＝1000000mg。",
+          "unit": "mg"
+        },
+        {
+          "num": true,
+          "q": "2kg−800g は何g？",
+          "answer": "1200",
+          "explain": "2kg＝2000g。2000−800＝1200g。",
+          "unit": "g"
+        },
+        {
+          "num": true,
+          "q": "水1Lの重さは何kg？",
+          "answer": "1",
+          "explain": "水は1L＝1kg（1mL＝1g）。理科でもよく使う。",
+          "unit": "kg"
+        },
+        {
+          "num": true,
+          "q": "2m² は何cm²？",
+          "answer": "20000",
+          "explain": "1m²＝10000cm²。10000×2＝20000cm²。",
+          "unit": "cm²"
+        },
+        {
+          "num": true,
+          "q": "5000cm² は何m²？",
+          "answer": "0.5",
+          "explain": "5000÷10000＝0.5m²。",
+          "unit": "m²"
+        },
+        {
+          "num": true,
+          "q": "2.5a は何m²？",
+          "answer": "250",
+          "explain": "1a＝100m²。100×2.5＝250m²。",
+          "unit": "m²"
+        },
+        {
+          "num": true,
+          "q": "800m² は何a？",
+          "answer": "8",
+          "explain": "800÷100＝8a。",
+          "unit": "a"
+        },
+        {
+          "num": true,
+          "q": "3ha は何m²？",
+          "answer": "30000",
+          "explain": "1ha＝10000m²。10000×3＝30000m²。",
+          "unit": "m²"
+        },
+        {
+          "num": true,
+          "q": "25000m² は何ha？",
+          "answer": "2.5",
+          "explain": "25000÷10000＝2.5ha。",
+          "unit": "ha"
+        },
+        {
+          "num": true,
+          "q": "4ha は何a？",
+          "answer": "400",
+          "explain": "1ha＝100a なので 4ha＝400a。",
+          "unit": "a"
+        },
+        {
+          "num": true,
+          "q": "2km² は何ha？",
+          "answer": "200",
+          "explain": "1km²＝100ha なので 2km²＝200ha。",
+          "unit": "ha"
+        },
+        {
+          "num": true,
+          "q": "0.3km² は何m²？",
+          "answer": "300000",
+          "explain": "1km²＝1000000m²。1000000×0.3＝300000m²。",
+          "unit": "m²"
+        },
+        {
+          "num": true,
+          "q": "1辺100mの正方形の土地の面積は何ha？",
+          "answer": "1",
+          "explain": "100×100＝10000m²＝1ha。",
+          "unit": "ha"
+        },
+        {
+          "num": true,
+          "q": "1時間15分 は何分？",
+          "answer": "75",
+          "explain": "60＋15＝75分。",
+          "unit": "分"
+        },
+        {
+          "num": true,
+          "q": "3時間 は何分？",
+          "answer": "180",
+          "explain": "60×3＝180分。",
+          "unit": "分"
+        },
+        {
+          "num": true,
+          "q": "2.5分 は何秒？",
+          "answer": "150",
+          "explain": "60×2.5＝150秒。",
+          "unit": "秒"
+        },
+        {
+          "num": true,
+          "q": "90秒 は何分？（小数で）",
+          "answer": "1.5",
+          "explain": "90÷60＝1.5分。",
+          "unit": "分"
+        },
+        {
+          "num": true,
+          "q": "30分 は何時間？（小数で）",
+          "answer": "0.5",
+          "explain": "30÷60＝0.5時間。",
+          "unit": "時間"
+        },
+        {
+          "num": true,
+          "q": "1時間 は何秒？",
+          "answer": "3600",
+          "explain": "60分×60秒＝3600秒。",
+          "unit": "秒"
+        },
+        {
+          "num": true,
+          "q": "2日 は何時間？",
+          "answer": "48",
+          "explain": "24×2＝48時間。",
+          "unit": "時間"
+        },
+        {
+          "num": true,
+          "q": "1時間12分 は何時間？（小数で）",
+          "answer": "1.2",
+          "explain": "12分＝12÷60＝0.2時間。1＋0.2＝1.2時間。",
+          "unit": "時間"
+        },
+        {
+          "num": true,
+          "q": "時速54km は 秒速何m？",
+          "answer": "15",
+          "explain": "54km＝54000m、1時間＝3600秒。54000÷3600＝秒速15m。",
+          "unit": "m"
+        },
+        {
+          "num": true,
+          "q": "秒速20m は 時速何km？",
+          "answer": "72",
+          "explain": "20×3600＝72000m＝72km。",
+          "unit": "km"
+        },
+        {
+          "num": true,
+          "q": "分速1.2km は 時速何km？",
+          "answer": "72",
+          "explain": "1.2×60＝72km。",
+          "unit": "km"
+        },
+        {
+          "num": true,
+          "q": "時速4.8km は 分速何m？",
+          "answer": "80",
+          "explain": "4.8km＝4800m。4800÷60＝分速80m。",
+          "unit": "m"
         }
       ]
     },
